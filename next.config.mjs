@@ -2,6 +2,8 @@
 const nextConfig = {
   // ไม่เปิด cacheComponents: ทุกหน้าอ่านข้อมูลผู้ป่วยตาม request และห้าม cache ฝั่งเซิร์ฟเวอร์
   output: "standalone",
+  // เว็บอยู่ใต้ path ย่อย เช่น /mra (กำหนดตอน build ด้วย BASE_PATH · เครื่องพัฒนาเว้นว่าง)
+  basePath: process.env.BASE_PATH || "",
   poweredByHeader: false,
   turbopack: {
     rules: {

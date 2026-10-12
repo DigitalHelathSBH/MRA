@@ -8,7 +8,9 @@ RUN npm ci
 
 FROM node:22-alpine AS build
 WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1
+# path ย่อยของเว็บ (ต้องตรงกับ location ใน Nginx) ต้องกำหนดตอน build
+ARG BASE_PATH=/mra
+ENV NEXT_TELEMETRY_DISABLED=1 BASE_PATH=$BASE_PATH
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

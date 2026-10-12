@@ -92,7 +92,10 @@ src/app/(app)       หน้าที่ต้อง login: / (เคสรอ�
 - ข้อมูลทดสอบต้องเป็นข้อมูลปลอม ห้ามส่งข้อมูลผู้ป่วยจริงให้ Claude
 
 ## Backup / Deploy / Rollback
-- ยังไม่ได้กำหนด server deploy และที่เก็บ backup (รอผู้ใช้)
+- Server: `10.0.120.17` (Linux, Docker + Nginx, HTTP ภายใน) โค้ดที่ `/opt/mra-ipd` เว็บ http://10.0.120.17/mra (`BASE_PATH=/mra` ตอน build, `COOKIE_SECURE=false`)
+- GitHub (private): https://github.com/digitalhealthsbh-mdi/MRA
+- DB จริง: ติดตั้ง `mra.*` ใน `MRA` แล้วเมื่อ 12 ต.ค. 2569 · ก่อนติดตั้งสำรองตารางเดิมไว้ที่ `MRA_TEST.bak.<ตาราง>_20261012` (db/backup_legacy_to_mra_test.sql) · ยังไม่มี job backup DB ประจำ (ควรให้ DBA กำหนด)
+- `.env` เครื่องพัฒนาใช้ `DB_NAME=MRA_TEST` เสมอ อย่าเปลี่ยนเป็น MRA ตอนทดสอบ
 - Docker (Next standalone, image tag = git commit) + Nginx HTTPS บน Linux ของ รพ. ดูขั้นตอนใน README · rollback = `TAG=<tag เดิม> docker compose up -d --no-build` (ตารางเดิมไม่เปลี่ยนโครงสร้าง จึงไม่ต้อง rollback DB)
 - Nginx ส่ง X-Forwarded-For เป็น $remote_addr ค่าเดียว (กันปลอม IP ใน AccessLog) และไม่ log query string
 

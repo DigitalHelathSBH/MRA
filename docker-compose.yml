@@ -2,7 +2,10 @@
 # (ไฟล์ .env อยู่ข้างไฟล์นี้บน server ห้าม commit)
 services:
   mra-ipd:
-    build: .
+    build:
+      context: .
+      args:
+        BASE_PATH: ${BASE_PATH:-/mra}   # ต้องตรงกับ location ใน Nginx
     image: mra-ipd:${TAG:-latest}   # ใส่ tag ตาม commit เพื่อ rollback ได้โดยไม่ต้อง build ใหม่
     container_name: mra-ipd
     env_file: .env
