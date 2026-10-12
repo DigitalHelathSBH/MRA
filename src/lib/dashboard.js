@@ -1,5 +1,6 @@
 import "server-only";
 import { query, sql } from "./db";
+import { basisDateSql, normBasis } from "./basis";
 
 // ปีงบประมาณ พ.ศ. → ช่วงวันที่จำหน่าย (1 ต.ค. ปีก่อน ถึง 30 ก.ย.)
 export function fiscalRange(fyBE) {
@@ -17,24 +18,25 @@ export function fiscalMonths(fyBE) {
   return Array.from({ length: 12 }, (_, i) => new Date(Date.UTC(y - 1, 9 + i, 1)).toISOString().slice(0, 7));
 }
 
-// ข้อมูล dashboard (เฉพาะผลที่บันทึกเสร็จ, จัดกลุ่มตามเดือนที่จำหน่าย) — ไม่มีข้อมูลระบุตัวผู้ป่วย
+// ข้อมูล dashboard (เฉพาะผลที่บันทึกเสร็จ) จัดกลุ่มตามเดือนที่จำหน่ายหรือเดือนที่ Audit (by) — ไม่มีข้อมูลระบุตัวผู้ป่วย
 // - แนวโน้มรายเดือน / รายแผนก: ทั้งปีงบ
 // - สรุป, รายแผนก, ราย content: ทั้งปี หรือเฉพาะเดือน month ('YYYY-MM') ถ้าระบุ (เกณฑ์ที่ไม่ผ่านบ่อย: reports.getTopFailedCriteria)
-export async function getDashboard({ fy, month, deptId }) {
+export async function getDashboard({ fy, month, deptId, by }) {
   const { from, to } = fiscalRange(fy);
   const mon = month && fiscalMonths(fy).includes(month) ? month : null;
+  const B = basisDateSql(normBasis(by), "w");
   const r = await query(
     `DECLARE @fy TABLE (AuditId INT PRIMARY KEY, DepartmentId INT, Mon CHAR(7), FullScore INT, SumScore INT, Adequate BIT, Overall TINYINT);
      INSERT INTO @fy
-     SELECT ar.AuditId, ar.DepartmentId, CONVERT(CHAR(7), ar.DischargeDate, 126), ar.FullScore, ar.SumScore, ar.IsFullScoreAdequate, ar.OverallFinding
-       FROM mra.AuditRecord ar
-      WHERE ar.RecordStatus = 'COMPLETED' AND ar.DischargeDate >= @from AND ar.DischargeDate < @to
+     SELECT ar.AuditId, ar.DepartmentId, CONVERT(CHAR(7), ${B}, 126), ar.FullScore, ar.SumScore, ar.IsFullScoreAdequate, ar.OverallFinding
+       FROM mra.AuditRecord ar JOIN mra.AuditWorklist w ON w.WorklistId = ar.WorklistId
+      WHERE ar.RecordStatus = 'COMPLETED' AND ${B} >= @from AND ${B} < @to
         AND (@dept IS NULL OR ar.DepartmentId = @dept);
      DECLARE @done TABLE (AuditId INT PRIMARY KEY, DepartmentId INT, FullScore INT, SumScore INT, Adequate BIT, Overall TINYINT);
      INSERT INTO @done SELECT AuditId, DepartmentId, FullScore, SumScore, Adequate, Overall FROM @fy WHERE @mon IS NULL OR Mon = @mon;
      DECLARE @wl TABLE (Mon CHAR(7), Status VARCHAR(15));
-     INSERT INTO @wl SELECT CONVERT(CHAR(7), DischargeDate, 126), WorklistStatus FROM mra.AuditWorklist
-      WHERE WorklistStatus <> 'CANCELLED' AND DischargeDate >= @from AND DischargeDate < @to AND (@dept IS NULL OR DepartmentId = @dept);
+     INSERT INTO @wl SELECT CONVERT(CHAR(7), ${B}, 126), w.WorklistStatus FROM mra.AuditWorklist w
+      WHERE w.WorklistStatus <> 'CANCELLED' AND ${B} >= @from AND ${B} < @to AND (@dept IS NULL OR w.DepartmentId = @dept);
 
      -- 0) สรุป (ช่วงที่เลือก)
      SELECT Completed = COUNT(*), FullSum = ISNULL(SUM(FullScore), 0), ScoreSum = ISNULL(SUM(SumScore), 0),

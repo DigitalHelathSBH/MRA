@@ -7,6 +7,8 @@ import SearchSelect from "@/components/search-select";
 import { TrendLine, ProgressColumns, BarList, BandChip } from "@/components/charts";
 import TableView from "@/components/table-view";
 import { monLabel, pctText } from "@/lib/format";
+import { BASIS, normBasis } from "@/lib/basis";
+import { BasisSelect } from "../reports/filters";
 
 export const metadata = { title: "Dashboard · MRA IPD" };
 
@@ -18,11 +20,13 @@ export default async function DashboardPage({ searchParams }) {
   const nowFy = currentFiscalYear();
   const fy = Number(sp.fy) || nowFy;
   const deptId = Number(sp.dept) || null;
+  const by = normBasis(sp.by);
+  const basis = BASIS[by];
 
   const [d, { departments }, topCriteria] = await Promise.all([
-    getDashboard({ fy, month: sp.month, deptId }), getDepartmentsAndWards(), getTopFailedCriteria({ fy, month: sp.month, deptId }),
+    getDashboard({ fy, month: sp.month, deptId, by }), getDepartmentsAndWards(), getTopFailedCriteria({ fy, month: sp.month, deptId, by }),
   ]);
-  await logAccess(user.UserId, "DASHBOARD", null, `fy ${fy}${d.month ? ` month ${d.month}` : ""}${deptId ? ` dept ${deptId}` : ""}`);
+  await logAccess(user.UserId, "DASHBOARD", null, `fy ${fy} by ${by}${d.month ? ` month ${d.month}` : ""}${deptId ? ` dept ${deptId}` : ""}`);
 
   const s = d.summary;
   const fyOptions = [...new Set([nowFy, nowFy - 1, ...d.fiscalYears])].sort((a, b) => b - a).map((y) => ({ value: y, label: `ปีงบประมาณ ${y}` }));
@@ -30,7 +34,7 @@ export default async function DashboardPage({ searchParams }) {
   const months = d.months.map((m) => ({ ...m, ...monLabel(m.Mon) }));
   const active = d.month ? months.findIndex((m) => m.Mon === d.month) : null;
   const deptName = departments.find((x) => x.DepartmentId === deptId)?.DepartmentName;
-  const scopeText = `${d.month ? `เดือน${monLabel(d.month).full}` : `ปีงบประมาณ ${fy}`}${deptName ? ` · ${deptName}` : ""}`;
+  const scopeText = `${d.month ? `${basis.label} ${monLabel(d.month).full}` : `ปีงบประมาณ ${fy} (ตาม${basis.label})`}${deptName ? ` · ${deptName}` : ""}`;
 
   // เทียบกับเดือนก่อนหน้าที่มีข้อมูล (เฉพาะเมื่อเลือกเดือน)
   const prev = active > 0 ? months.slice(0, active).findLast((m) => m.pct != null) : null;
@@ -41,17 +45,18 @@ export default async function DashboardPage({ searchParams }) {
       <div className="page-head">
         <div>
           <h1>Dashboard คุณภาพการบันทึกเวชระเบียนผู้ป่วยใน</h1>
-          <p>นับเฉพาะเคสที่บันทึกเสร็จ จัดตามเดือนที่จำหน่าย · คะแนนรวม = คะแนนที่ได้ ÷ คะแนนเต็ม ของทุกเคส</p>
+          <p>นับเฉพาะเคสที่บันทึกเสร็จ จัดตาม{basis.label}{by === "audit" ? " (รอบที่สุ่มไว้ ถ้าไม่ได้กำหนด = เดือนจำหน่าย + 2)" : ""} · คะแนนรวม = คะแนนที่ได้ ÷ คะแนนเต็ม ของทุกเคส</p>
         </div>
       </div>
 
       <form method="get" className="row" style={{ alignItems: "flex-end" }}>
+        <BasisSelect value={by} />
         <div className="field" style={{ minWidth: 200 }}>
           <label htmlFor="fy">ปีงบประมาณ</label>
           <SearchSelect id="fy" name="fy" defaultValue={fy} options={fyOptions} submitOnChange />
         </div>
         <div className="field" style={{ minWidth: 200 }}>
-          <label htmlFor="month">เดือน</label>
+          <label htmlFor="month">{basis.label}</label>
           <SearchSelect id="month" name="month" defaultValue={d.month ?? ""} emptyLabel="ทั้งปี" options={monthOptions} submitOnChange />
         </div>
         <div className="field" style={{ minWidth: 220 }}>
@@ -112,7 +117,7 @@ export default async function DashboardPage({ searchParams }) {
 
         <div className="panel span-7">
           <h2>คะแนนรวมรายเดือน ปีงบ {fy}</h2>
-          <p className="sub">จุดแต่ละเดือนมีสีตามระดับคะแนน{d.month ? ` · ไฮไลต์${monLabel(d.month).label}` : ""}</p>
+          <p className="sub">แยกตาม{basis.label} · จุดแต่ละเดือนมีสีตามระดับคะแนน{d.month ? ` · ไฮไลต์${monLabel(d.month).label}` : ""}</p>
           <TrendLine ariaLabel="กราฟเส้นคะแนนรวมรายเดือน" active={active}
             points={months.map((m) => ({ label: m.label, short: m.short, value: m.pct, n: m.Completed }))} />
           <TableView rows={months} columns={[

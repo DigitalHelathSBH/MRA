@@ -1,5 +1,6 @@
 import "server-only";
 import { query, transaction, sql, HIS, valuesList } from "./db";
+import { auditMonthSql } from "./basis";
 
 /* ---------------- เกณฑ์การประเมิน (ข้อมูลอ้างอิง ไม่มีข้อมูลผู้ป่วย) ---------------- */
 let criteriaCache = null;
@@ -98,8 +99,7 @@ export async function listWorklist({ month, deptId, wardId, status, q }) {
        LEFT JOIN mra.Ward wd ON wd.WardId = w.WardId
        LEFT JOIN mra.AuditRecord ar ON ar.WorklistId = w.WorklistId
       WHERE w.WorklistStatus <> 'CANCELLED'
-        AND ISNULL(w.PlannedAuditDate, DATEADD(MONTH, 2, DATEFROMPARTS(YEAR(w.DischargeDate), MONTH(w.DischargeDate), 1))) >= @from
-        AND ISNULL(w.PlannedAuditDate, DATEADD(MONTH, 2, DATEFROMPARTS(YEAR(w.DischargeDate), MONTH(w.DischargeDate), 1))) < @to
+        AND ${auditMonthSql("w")} >= @from AND ${auditMonthSql("w")} < @to
         AND (@dept IS NULL OR w.DepartmentId = @dept)
         AND (@ward IS NULL OR w.WardId = @ward)
         AND (@q IS NULL OR w.AN LIKE @q + '%' OR w.HN LIKE @q + '%')

@@ -78,9 +78,14 @@ export function TrendLine({ points, height = 240, ariaLabel, compact, active }) 
         {points.map((p, i) => p.value != null && (
           <circle key={`b${i}`} cx={x(i)} cy={y(p.value)} r={i === active ? 7 : compact ? 4 : 5} className={`viz-dot band-${bandKey(p.value)}`} />
         ))}
-        {labelIdx >= 0 && (
-          <text x={x(labelIdx) + 10} y={y(points[labelIdx].value) - 10} className="viz-label">{fmtPct(points[labelIdx].value)}</text>
-        )}
+        {labelIdx >= 0 && (() => {
+          // จุดสุดท้ายชิดขอบขวา → วางป้ายไว้ซ้ายของจุด ไม่ให้ทับป้ายเส้นเกณฑ์
+          const atEnd = labelIdx >= points.length - 2;
+          return (
+            <text x={x(labelIdx) + (atEnd ? -10 : 10)} y={y(points[labelIdx].value) - 10} textAnchor={atEnd ? "end" : "start"}
+              className="viz-label">{fmtPct(points[labelIdx].value)}</text>
+          );
+        })()}
         {hp && (
           <line x1={x(hover)} x2={x(hover)} y1={T} y2={T + ih} className="viz-cross" pointerEvents="none" />
         )}

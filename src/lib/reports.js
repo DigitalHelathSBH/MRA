@@ -1,18 +1,22 @@
 import "server-only";
 import { query, sql } from "./db";
 import { fiscalRange, fiscalMonths } from "./dashboard";
+import { basisDateSql, normBasis } from "./basis";
 
-// ชุดเคสที่บันทึกเสร็จตามตัวกรอง (ปีงบ / เดือน / แผนก) → ตาราง @rec
-const REC_SQL = `
+// ชุดเคสที่บันทึกเสร็จตามตัวกรอง (ปีงบ / เดือน / แผนก) → ตาราง @rec · Mon = เดือนตาม by (จำหน่าย/Audit)
+const recSql = (by) => {
+  const B = basisDateSql(normBasis(by), "w");
+  return `
   DECLARE @rec TABLE (AuditId INT PRIMARY KEY, AN VARCHAR(20), DischargeDate DATE, Mon CHAR(7),
                       DepartmentId INT, WardId INT, DoctorId INT, AuditorId INT);
   INSERT INTO @rec
-  SELECT ar.AuditId, ar.AN, ar.DischargeDate, CONVERT(CHAR(7), ar.DischargeDate, 126),
+  SELECT ar.AuditId, ar.AN, ar.DischargeDate, CONVERT(CHAR(7), ${B}, 126),
          ar.DepartmentId, ar.WardId, ar.DoctorId, ar.AuditorId
-    FROM mra.AuditRecord ar
-   WHERE ar.RecordStatus = 'COMPLETED' AND ar.DischargeDate >= @from AND ar.DischargeDate < @to
+    FROM mra.AuditRecord ar JOIN mra.AuditWorklist w ON w.WorklistId = ar.WorklistId
+   WHERE ar.RecordStatus = 'COMPLETED' AND ${B} >= @from AND ${B} < @to
      AND (@dept IS NULL OR ar.DepartmentId = @dept)
-     AND (@mon IS NULL OR CONVERT(CHAR(7), ar.DischargeDate, 126) = @mon);`;
+     AND (@mon IS NULL OR CONVERT(CHAR(7), ${B}, 126) = @mon);`;
+};
 
 // ผลรายเกณฑ์ที่นำมาคิด % (ไม่รวมหัวข้อที่เป็น NA)
 // Passed = ผ่านจริง (PASS และไม่โดน gate) · Rated = ผ่าน + ไม่ผ่าน + หัวข้อ Missing/No (นับเป็นไม่ผ่าน) · ไม่นับเกณฑ์ที่เป็น NA
@@ -32,18 +36,18 @@ const CRIT_CTE = `
       LEFT JOIN mra.AuditCriterionResult r ON r.AuditId = x.AuditId AND r.CriterionId = c.CriterionId
   )`;
 
-function params({ fy, month, deptId }) {
+function params({ fy, month, deptId, by }) {
   const { from, to } = fiscalRange(fy);
   const mon = month && fiscalMonths(fy).includes(month) ? month : null;
-  return { mon, p: { from: [sql.Date, from], to: [sql.Date, to], dept: [sql.Int, deptId || null], mon: [sql.Char(7), mon] } };
+  return { mon, rec: recSql(by), p: { from: [sql.Date, from], to: [sql.Date, to], dept: [sql.Int, deptId || null], mon: [sql.Char(7), mon] } };
 }
 const pct = (a, b) => (b ? (a * 100) / b : null);
 
 /* ---------- ตาราง หัวข้อ × เกณฑ์ ---------- */
 export async function getCriteriaMatrix(filter) {
-  const { mon, p } = params(filter);
+  const { mon, rec, p } = params(filter);
   const r = await query(
-    `${REC_SQL}
+    `${rec}
      WITH ${CRIT_CTE}
      SELECT ContentNo, CriterionNo, Passed = SUM(Passed), Rated = SUM(Rated) FROM cr GROUP BY ContentNo, CriterionNo;
 
@@ -80,9 +84,9 @@ export async function getCriteriaMatrix(filter) {
 
 /* ---------- เกณฑ์ที่ไม่ผ่านบ่อยที่สุด (ใช้ใน dashboard, สูตรเดียวกับตารางรายเกณฑ์) ---------- */
 export async function getTopFailedCriteria(filter, top = 10, minRated = 5) {
-  const { p } = params(filter);
+  const { rec, p } = params(filter);
   const r = await query(
-    `${REC_SQL}
+    `${rec}
      WITH ${CRIT_CTE}
      SELECT TOP (@top) cr.ContentNo, MAX(ac.TitleEn) AS TitleEn, cr.CriterionNo, MAX(c.CriterionText) AS CriterionText,
             Fail = SUM(cr.Rated) - SUM(cr.Passed), Rated = SUM(cr.Rated)
@@ -98,9 +102,9 @@ export async function getTopFailedCriteria(filter, top = 10, minRated = 5) {
 /* ---------- รายละเอียดเกณฑ์ข้อเดียว ---------- */
 // includeCases = false → ไม่ดึงรายชื่อเคส (AN) เลย ใช้กับผู้ที่ไม่มีสิทธิ์ (canViewCaseList)
 export async function getCriterionDetail(filter, contentNo, criterionNo, { includeCases = false } = {}) {
-  const { mon, p } = params(filter);
+  const { mon, rec, p } = params(filter);
   const r = await query(
-    `${REC_SQL}
+    `${rec}
      SELECT ac.TitleEn, ac.TitleTh, c.CriterionText, c.NoteText
        FROM mra.AuditCriterion c JOIN mra.AuditContent ac ON ac.ContentId = c.ContentId
        JOIN mra.CriteriaSet cs ON cs.CriteriaSetId = ac.CriteriaSetId AND cs.IsActive = 1
@@ -156,9 +160,9 @@ export async function getCriterionDetail(filter, contentNo, criterionNo, { inclu
 
 /* ---------- รายละเอียดหัวข้อ: เกณฑ์ทั้งหมด + คะแนนหัวข้อแยกแผนก ---------- */
 export async function getContentDetail(filter, contentNo) {
-  const { mon, p } = params(filter);
+  const { mon, rec, p } = params(filter);
   const r = await query(
-    `${REC_SQL}
+    `${rec}
      SELECT ac.ContentNo, ac.TitleEn, ac.TitleTh, ac.HintText FROM mra.AuditContent ac
        JOIN mra.CriteriaSet cs ON cs.CriteriaSetId = ac.CriteriaSetId AND cs.IsActive = 1 WHERE ac.ContentNo = @cn;
 

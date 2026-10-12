@@ -45,7 +45,7 @@ src/lib/scoring.js  คิดคะแนนฝั่งหน้าจอ (ต�
 src/lib/dashboard.js ข้อมูล dashboard (ปีงบประมาณ ต.ค.–ก.ย., จัดตามเดือนที่จำหน่าย, เฉพาะเคส COMPLETED)
 src/components/     search-select (dropdown ค้นหาได้ ใช้แทน <select> ทุกที่), fancy-check (radio/checkbox), charts (SVG วัดความกว้างจริง), table-view
 src/lib/reports.js  รายงาน % ผ่านรายเกณฑ์ (หัวข้อ × เกณฑ์) + รายละเอียดเกณฑ์/หัวข้อ · % ผ่าน = ผ่านจริง (ไม่โดน gate) ÷ (ผ่าน+ไม่ผ่าน+หัวข้อ Missing/No) ไม่นับ NA
-src/lib/sampling.js สุ่มรายชื่อตามคิวรี่สุ่มของงานเวชระเบียน → mra.AuditWorklist (ImportBatch 'RANDOM-YYYY-MM' เดือนละครั้ง) · รอบ audit ตรวจเคสที่จำหน่ายย้อนหลัง 2 เดือน · เลือก "เดือนที่ Audit" ตอนสุ่ม เก็บเป็นวันที่ 1 ของเดือนใน PlannedAuditDate · หน้าเคสรอตรวจกรองตามเดือนที่ Audit (ไม่มีค่า = เดือนจำหน่าย + 2) · เพิ่มด้วย AN = เดือนปัจจุบัน · dashboard/รายงานยังจัดตามเดือนที่จำหน่าย
+src/lib/sampling.js สุ่มรายชื่อตามคิวรี่สุ่มของงานเวชระเบียน → mra.AuditWorklist (ImportBatch 'RANDOM-YYYY-MM' เดือนละครั้ง) · รอบ audit ตรวจเคสที่จำหน่ายย้อนหลัง 2 เดือน · เลือก "เดือนที่ Audit" ตอนสุ่ม เก็บเป็นวันที่ 1 ของเดือนใน PlannedAuditDate · หน้าเคสรอตรวจกรองตามเดือนที่ Audit (ไม่มีค่า = เดือนจำหน่าย + 2) · เพิ่มด้วย AN = เดือนปัจจุบัน · dashboard/รายงานเลือกได้ว่าจัดตามเดือนที่จำหน่าย (ค่าเริ่มต้น) หรือเดือนที่ Audit (`?by=audit`) นิยามอยู่ที่ `src/lib/basis.js` ใช้ร่วมกับหน้าเคสรอตรวจ
 src/app/login       หน้า login
 src/app/(app)       หน้าที่ต้อง login: / (เคสรอตรวจ), /audit/[an] (แบบตรวจ), /sampling (สุ่มรายชื่อ), /dashboard, /reports (+ /reports/criterion, /reports/content)
 ```
