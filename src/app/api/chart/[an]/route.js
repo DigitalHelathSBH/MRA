@@ -4,7 +4,7 @@ import { query, sql } from "@/lib/db";
 // เวชระเบียนสแกน (PDF) ของ AN — ส่งต่อจากเครื่องเก็บไฟล์ของ รพ. ผ่านเว็บนี้ เพื่อให้
 // ต้อง login, ดูได้เฉพาะ AN ที่อยู่ในรายการตรวจ และบันทึก AccessLog ทุกครั้ง
 // CHART_PDF_URL ใน .env เช่น http://<host>/chart/{an}.pdf
-export async function GET(_req, { params }) {
+export async function GET(req, { params }) {
   const { an } = await params;
   const user = await getCurrentUser();
   if (!user) return message(401, "กรุณาเข้าสู่ระบบ");
@@ -18,25 +18,44 @@ export async function GET(_req, { params }) {
   });
   if (!inList.recordset.length) return message(403, "ดูเวชระเบียนสแกนได้เฉพาะเคสที่อยู่ในรายการตรวจ");
 
+  // ไฟล์ใหญ่ได้ถึงหลักร้อย MB: timeout เฉพาะช่วงรอ header (ไม่ตัดระหว่างส่งไฟล์)
+  // และส่ง Range ต่อ เพื่อให้ตัวแสดง PDF ของเบราว์เซอร์โหลดทีละส่วนได้
+  const range = req.headers.get("range");
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  req.signal?.addEventListener("abort", () => ctrl.abort()); // ผู้ใช้ปิดหน้า → หยุดดึงไฟล์
   let res;
   try {
-    res = await fetch(tpl.replace("{an}", encodeURIComponent(an)), { signal: AbortSignal.timeout(30000), cache: "no-store" });
+    res = await fetch(tpl.replace("{an}", encodeURIComponent(an)), {
+      signal: ctrl.signal, cache: "no-store", headers: range ? { Range: range } : {},
+    });
   } catch {
     return message(502, "เชื่อมต่อเครื่องเก็บเวชระเบียนสแกนไม่ได้");
+  } finally {
+    clearTimeout(timer);
   }
   if (res.status === 404) return message(404, `ไม่พบเวชระเบียนสแกนของ AN ${an}`);
+  if (res.status === 416) return new Response(null, { status: 416, headers: pass(res, ["content-range"]) });
   if (!res.ok || !res.body) return message(502, "เครื่องเก็บเวชระเบียนสแกนตอบกลับผิดปกติ");
 
-  await logAccess(user.UserId, "CHART_VIEW", an);
+  // log ครั้งเดียวต่อการเปิด (คำขอแรกไม่มี Range หรือเริ่มที่ byte 0) ไม่ใช่ทุกชิ้นที่โหลด
+  if (!range || /^bytes=0-/.test(range)) await logAccess(user.UserId, "CHART_VIEW", an);
   return new Response(res.body, {
+    status: res.status, // 200 หรือ 206
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `inline; filename="${an}.pdf"`,
       "Cache-Control": "no-store",
       "X-Frame-Options": "SAMEORIGIN", // แสดงใน iframe ของหน้าแบบตรวจได้ (เว็บอื่นฝังไม่ได้)
-      ...(res.headers.get("content-length") ? { "Content-Length": res.headers.get("content-length") } : {}),
+      ...pass(res, ["content-length", "content-range", "accept-ranges"]),
     },
   });
+}
+
+function pass(res, names) {
+  const h = {};
+  for (const n of names) if (res.headers.get(n)) h[n] = res.headers.get(n);
+  return h;
 }
 
 // ข้อความแสดงใน iframe แทน PDF

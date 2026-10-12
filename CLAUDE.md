@@ -71,7 +71,7 @@ src/app/(app)       หน้าที่ต้อง login: / (เคสรอ�
 - บันทึกเสร็จ = transaction เดียว: บันทึก `mra.*` → recalc → COMPLETED → `usp_SyncLegacy`
 - เขียนกลับตารางเดิม: `audit_time` = 1 เสมอ, `audit_year` = ปีงบ พ.ศ., data1–9 = '1'/'0'/'NA' (ข้อที่โดน gate = '0')
 - หน้าเดิมยังเปิดใช้คู่กัน: AN ที่มีในตารางเดิมแต่ `LegacySyncedAt` ว่าง = บันทึกจากระบบเดิม → ห้ามเขียนทับ (แสดงสถานะ LEGACY)
-- หน้าแบบตรวจแบ่งจอ: ซ้าย = เวชระเบียนสแกน PDF ผ่าน `/api/chart/[an]` (proxy จาก `CHART_PDF_URL`, ต้อง login, เฉพาะ AN ใน worklist, log `CHART_VIEW`) · ไฟล์ต้นทางเดิมของ intranet คือ `/chart/{AN}.pdf` บนเครื่อง SBH_New (IP ภายใน 192.168.102.103)
+- หน้าแบบตรวจแบ่งจอ: ซ้าย = เวชระเบียนสแกน PDF ผ่าน `/api/chart/[an]` (proxy จาก `CHART_PDF_URL`, ต้อง login, เฉพาะ AN ใน worklist, log `CHART_VIEW`) · ต้นทาง `http://10.0.255.111/chart/{an}.pdf` (รองรับ Range; ไฟล์ใหญ่ได้ ~150MB → route ส่ง Range ต่อ และ timeout เฉพาะช่วงรอ header ห้ามใช้ AbortSignal.timeout เพราะจะตัดกลางไฟล์) · log CHART_VIEW เฉพาะคำขอแรก (ไม่มี Range หรือ bytes=0-)
 - รายชื่อเคส (AN) ในรายงานรายละเอียดเกณฑ์ (/reports/criterion) เห็นได้เฉพาะ `PYREXT.DIVISION` 802 (ฝ่ายสุขภาพดิจิทัล) และ 803 (ฝ่ายเวชระเบียน) — `CASE_LIST_DIVISIONS` ใน auth.js ตรวจทุก request และผู้ไม่มีสิทธิ์จะไม่ถูกดึงรายชื่อเลย
 - ผู้ใช้ login ครั้งแรกถูกเพิ่มเป็น AUDITOR อัตโนมัติ เปลี่ยนบทบาทที่ `mra.AppUser.RoleCode`
 
