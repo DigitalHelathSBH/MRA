@@ -1,5 +1,5 @@
 import "server-only";
-import { query, transaction, sql, HIS } from "./db";
+import { query, transaction, sql, HIS, valuesList } from "./db";
 
 /* ---------------- เกณฑ์การประเมิน (ข้อมูลอ้างอิง ไม่มีข้อมูลผู้ป่วย) ---------------- */
 let criteriaCache = null;
@@ -300,11 +300,12 @@ export async function saveAudit(payload, mode, user) {
     await q(`DELETE FROM mra.AuditCriterionResult WHERE AuditId = @a`, { a: [sql.Int, auditId] });
     const rows = items.flatMap((it) => (it.status === "ASSESS" ? Object.entries(it.crit) : []));
     if (rows.length) {
-      // ส่งเป็น JSON เพื่อ insert ครั้งเดียว (ไม่ต้องสร้าง table type ใน DB)
+      // insert ครั้งเดียวด้วย VALUES (เกณฑ์สูงสุด 106 ข้อ = 212 parameter)
+      const v = valuesList("r", rows.map(([c, res]) => [Number(c), res]), [sql.Int, sql.VarChar(4)]);
       await q(
         `INSERT INTO mra.AuditCriterionResult (AuditId, CriterionId, Result)
-         SELECT @a, j.CriterionId, j.Result FROM OPENJSON(@json) WITH (CriterionId INT '$[0]', Result VARCHAR(4) '$[1]') j`,
-        { a: [sql.Int, auditId], json: [sql.NVarChar(sql.MAX), JSON.stringify(rows.map(([c, v]) => [Number(c), v]))] }
+         SELECT @a, v.CriterionId, v.Result FROM (VALUES ${v.text}) v(CriterionId, Result)`,
+        { a: [sql.Int, auditId], ...v.params }
       );
     }
     await q(`EXEC mra.usp_RecalculateAuditScore @AuditId = @a`, { a: [sql.Int, auditId] });

@@ -62,4 +62,22 @@ function bind(req, params) {
   }
 }
 
+// รายการค่าเป็น VALUES แบบ parameterized แทน OPENJSON (DB MRA ใช้ compatibility level 120 ไม่มี OPENJSON)
+// valuesList("r", [[1, "PASS"], [2, "FAIL"]], [sql.Int, sql.VarChar(4)])
+//   → { text: "(@r0_0, @r0_1), (@r1_0, @r1_1)", params: { r0_0: [sql.Int, 1], ... } }
+// SQL Server รับ parameter ได้ไม่เกิน 2100 ต่อคำสั่ง
+export function valuesList(prefix, rows, types) {
+  if (!rows.length) throw new Error("valuesList: ไม่มีข้อมูล");
+  if (rows.length * types.length > 2000) throw new Error("valuesList: ข้อมูลมากเกินไป");
+  const params = {};
+  const text = rows
+    .map((row, i) => `(${types.map((t, j) => {
+      const name = `${prefix}${i}_${j}`;
+      params[name] = [t, row[j]];
+      return `@${name}`;
+    }).join(", ")})`)
+    .join(", ");
+  return { text, params };
+}
+
 export { sql };

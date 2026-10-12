@@ -1,5 +1,5 @@
 import "server-only";
-import { query, transaction, sql, HIS } from "./db";
+import { query, transaction, sql, HIS, valuesList } from "./db";
 import { upsertDoctor } from "./audit";
 
 // เงื่อนไขและโควตาตาม "คิวรี่สุ่ม MRA IPD.sql" ของงานเวชระเบียน (ไม่ดึงชื่อผู้ป่วย)
@@ -68,15 +68,15 @@ export async function drawSample(month) {
   const r = await query(RANDOM_SQL, { from: [sql.DateTime, from], to: [sql.DateTime, to] });
   const rows = r.recordset;
   if (!rows.length) return [];
-  const ans = JSON.stringify(rows.map((x) => x.AN));
+  const ans = valuesList("an", rows.map((x) => [x.AN]), [sql.VarChar(20)]);
   const m = await query(
     `SELECT j.value AS AN,
             InWorklist = CASE WHEN EXISTS (SELECT 1 FROM mra.AuditWorklist w WHERE w.AN = j.value AND w.WorklistStatus <> 'CANCELLED') THEN 1 ELSE 0 END,
             InLegacy   = CASE WHEN EXISTS (SELECT 1 FROM dbo.mra_ipd_main l WHERE l.an = j.value) THEN 1 ELSE 0 END
-       FROM OPENJSON(@ans) j;
+       FROM (VALUES ${ans.text}) j(value);
      SELECT HisSpecialtyCode, HisDxPrefix, DepartmentName FROM mra.Department WHERE IsActive = 1 AND HisSpecialtyCode IS NOT NULL;
      SELECT HisWardCode FROM mra.Ward WHERE HisWardCode IS NOT NULL;`,
-    { ans: [sql.NVarChar(sql.MAX), ans] }
+    ans.params
   );
   const flags = new Map(m.recordsets[0].map((x) => [x.AN, x]));
   const depts = m.recordsets[1];
@@ -116,16 +116,17 @@ export async function saveSample(month, items, user, auditMonth = null) {
     });
     if (exists.recordset.length) throw userError("เดือนนี้สุ่มและบันทึกรายชื่อไปแล้ว");
 
+    const vl = valuesList("l", list.map((x) => [x.an, x.seqNo]), [sql.VarChar(20), sql.Int]);
     const his = await q(
       `SELECT j.SeqNo, RTRIM(a.AN) AS AN, RTRIM(a.HN) AS HN, a.ADMDATETIME, a.DISCHARGEDATETIME,
               RTRIM(a.ADMWARD) AS Ward, RTRIM(a.SPECIALTY) AS Specialty, s.DIAGNOSES AS Dx,
               Doctor = RTRIM(COALESCE(NULLIF(s.DOCTOR, ''),
                          (SELECT TOP 1 d.DOCTOR FROM ${HIS}.dbo.IPDDOCTOR d WHERE d.AN = a.AN ORDER BY d.VALIDTOPOSTFROMDATETIME DESC)))
-         FROM OPENJSON(@list) WITH (AN VARCHAR(20) '$.an', SeqNo INT '$.seqNo') j
+         FROM (VALUES ${vl.text}) j(AN, SeqNo)
          JOIN ${HIS}.dbo.ADMMASTER a ON a.AN = j.AN
          LEFT JOIN ${HIS}.dbo.IPDSUMMARY s ON s.AN = a.AN AND s.SUFFIX = 1
         WHERE a.DISCHARGEDATETIME >= @from AND a.DISCHARGEDATETIME < @to`,
-      { list: [sql.NVarChar(sql.MAX), JSON.stringify(list)], from: [sql.DateTime, from], to: [sql.DateTime, to] }
+      { ...vl.params, from: [sql.DateTime, from], to: [sql.DateTime, to] }
     );
 
     const batchId = (
