@@ -9,14 +9,18 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "iron-session": "^9.0.1",
+    "mssql": "^12.7.4",
     "next": "16.4.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15"
   }
 }

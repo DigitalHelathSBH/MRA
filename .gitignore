@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+!.env.example
+
+# data / backups (อาจมีข้อมูลผู้ป่วย ห้าม commit)
+*.bak
+*.csv
+*.xlsx
+*.xls
+/data/

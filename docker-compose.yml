@@ -1,0 +1,12 @@
+# ใช้: docker compose up -d --build   (ไฟล์ .env อยู่ข้างไฟล์นี้บน server ห้าม commit)
+services:
+  mra-ipd:
+    build: .
+    image: mra-ipd:latest
+    container_name: mra-ipd
+    env_file: .env
+    environment:
+      TZ: Asia/Bangkok
+    ports:
+      - "127.0.0.1:3000:3000"   # เปิดเฉพาะในเครื่อง ให้ Nginx เป็นทางเข้า
+    restart: unless-stopped

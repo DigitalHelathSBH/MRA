@@ -1,0 +1,13 @@
+.git
+.next
+node_modules
+.env
+.env.*
+!.env.example
+*.bak
+*.csv
+*.xlsx
+data
+scripts
+db
+.claude
