@@ -43,7 +43,6 @@ export default function ReportFilters({ filter, departments, hidden = {} }) {
   return (
     <form method="get" className="row" style={{ alignItems: "flex-end" }}>
       {Object.entries(hidden).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-      <BasisSelect value={filter.by} />
       <div className="field" style={{ minWidth: 200 }}>
         <label htmlFor="fy">ปีงบประมาณ</label>
         <SearchSelect id="fy" name="fy" defaultValue={filter.fy} options={fyOptions} submitOnChange />
@@ -58,6 +57,7 @@ export default function ReportFilters({ filter, departments, hidden = {} }) {
         <SearchSelect id="dept" name="dept" defaultValue={filter.deptId ?? ""} emptyLabel="ทุกแผนก" submitOnChange
           options={departments.map((d) => ({ value: d.DepartmentId, label: d.DepartmentName }))} />
       </div>
+      <BasisSelect value={filter.by} />
       <span className="spacer" />
       <span className="band-legend" aria-label="เกณฑ์ระดับคะแนน">
         {BANDS.map((b, i) => <span key={b.key} className={`chip band-${b.key}`}><i>{b.icon}</i>{b.label} {bandRangeText(b, i)}</span>)}

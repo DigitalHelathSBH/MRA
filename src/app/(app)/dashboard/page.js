@@ -50,7 +50,6 @@ export default async function DashboardPage({ searchParams }) {
       </div>
 
       <form method="get" className="row" style={{ alignItems: "flex-end" }}>
-        <BasisSelect value={by} />
         <div className="field" style={{ minWidth: 200 }}>
           <label htmlFor="fy">ปีงบประมาณ</label>
           <SearchSelect id="fy" name="fy" defaultValue={fy} options={fyOptions} submitOnChange />
@@ -64,6 +63,7 @@ export default async function DashboardPage({ searchParams }) {
           <SearchSelect id="dept" name="dept" defaultValue={deptId ?? ""} emptyLabel="ทุกแผนก" submitOnChange
             options={departments.map((x) => ({ value: x.DepartmentId, label: x.DepartmentName }))} />
         </div>
+        <BasisSelect value={by} />
         <span className="spacer" />
         <span className="band-legend" aria-label="เกณฑ์ระดับคะแนน">
           {BANDS.map((b, i) => <span key={b.key} className={`chip band-${b.key}`}><i>{b.icon}</i>{b.label} {bandRangeText(b, i)}</span>)}
