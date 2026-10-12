@@ -23,7 +23,7 @@ export default async function CriterionPage({ searchParams }) {
   const [d, { departments }] = await Promise.all([getCriterionDetail(f, cn, no), getDepartmentsAndWards()]);
   if (!d) notFound();
   f.month = d.month;
-  await logAccess(user.UserId, "REPORT", null, `criterion ${cn}.${no} ${filterQuery(f)}`);
+  await logAccess(user.UserId, "REPORT", null, `criterion ${cn}.${no} ${filterQuery(f)} · แสดง ${d.failed.length} AN`);
 
   const months = d.months.map((m) => ({ ...m, ...monLabel(m.Mon) }));
   const active = f.month ? months.findIndex((m) => m.Mon === f.month) : null;

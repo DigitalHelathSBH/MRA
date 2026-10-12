@@ -73,7 +73,7 @@ export async function upsertDoctor(q, code) {
   if (!code) return null;
   const name = (await q(`SELECT ${HIS}.dbo.GetUserFullName(@c) AS Name`, { c: [sql.VarChar(20), code] })).recordset[0]?.Name;
   const r = await q(
-    `MERGE mra.Doctor AS t USING (SELECT @c AS DoctorCode, @n AS DoctorName) AS s ON t.DoctorCode = s.DoctorCode
+    `MERGE mra.Doctor WITH (HOLDLOCK) AS t USING (SELECT @c AS DoctorCode, @n AS DoctorName) AS s ON t.DoctorCode = s.DoctorCode
      WHEN MATCHED THEN UPDATE SET DoctorName = s.DoctorName
      WHEN NOT MATCHED THEN INSERT (DoctorCode, DoctorName) VALUES (s.DoctorCode, s.DoctorName)
      OUTPUT inserted.DoctorId;`,
@@ -212,6 +212,9 @@ export async function saveAudit(payload, mode, user) {
   const criteria = await getCriteria();
   const items = validateItems(payload.items, criteria);
   const auditDate = parseDate(payload.auditDate, "วันที่ตรวจประเมิน");
+  if (auditDate > todayISO()) throw new SaveError("วันที่ตรวจประเมินต้องไม่เกินวันนี้");
+  const departmentId = Number(payload.departmentId);
+  if (!Number.isInteger(departmentId) || departmentId <= 0) throw new SaveError("กรุณาเลือกแผนก");
   const overall = payload.overall ? Number(payload.overall) : null;
   if (overall !== null && ![1, 2, 3].includes(overall)) throw new SaveError("Overall finding ไม่ถูกต้อง");
   const spec = String(payload.spec ?? "").trim().slice(0, 1000) || null;
@@ -220,7 +223,9 @@ export async function saveAudit(payload, mode, user) {
     const w = (
       await q(
         `SELECT w.WorklistId, w.AN, w.HN, w.AdmitDate, w.DischargeDate, ar.AuditId, ar.RecordStatus, ar.CreatedBy,
-                CONVERT(VARCHAR(20), CONVERT(BINARY(8), ar.RowVer), 1) AS RowVer
+                CONVERT(VARCHAR(20), CONVERT(BINARY(8), ar.RowVer), 1) AS RowVer,
+                IsLegacy = CASE WHEN ar.LegacySyncedAt IS NULL AND EXISTS (SELECT 1 FROM dbo.mra_ipd_main m WHERE m.an = w.AN)
+                                THEN 1 ELSE 0 END
            FROM mra.AuditWorklist w WITH (UPDLOCK)
            LEFT JOIN mra.AuditRecord ar ON ar.WorklistId = w.WorklistId
           WHERE w.AN = @an AND w.WorklistStatus <> 'CANCELLED'`,
@@ -228,6 +233,7 @@ export async function saveAudit(payload, mode, user) {
       )
     ).recordset[0];
     if (!w) throw new SaveError("ไม่พบเคสนี้ในรายการ");
+    if (w.IsLegacy) throw new SaveError("AN นี้บันทึกผลตรวจจากระบบเดิมแล้ว ระบบใหม่จะไม่บันทึกทับ");
     if (w.RowVer && w.RowVer !== payload.rowVer)
       throw new SaveError("เคสนี้ถูกแก้ไขจากเครื่องอื่นหลังจากที่คุณเปิด กรุณาโหลดหน้าใหม่ก่อนบันทึก");
     const wasCompleted = w.RecordStatus === "COMPLETED";
@@ -239,7 +245,7 @@ export async function saveAudit(payload, mode, user) {
     const doctorCode = String(payload.doctorCode ?? "").trim();
     if (doctorCode && !/^[A-Za-z0-9]{1,14}$/.test(doctorCode)) throw new SaveError("รหัสแพทย์ไม่ถูกต้อง");
     const header = {
-      dept: [sql.Int, Number(payload.departmentId)],
+      dept: [sql.Int, departmentId],
       ward: [sql.Int, payload.wardId ? Number(payload.wardId) : null],
       doc: [sql.Int, await upsertDoctor(q, doctorCode)],
       adate: [sql.Date, auditDate],
@@ -377,9 +383,17 @@ function validateItems(items, criteria) {
   });
 }
 
+// รับเฉพาะวันที่ที่มีจริง (กัน 2026-02-30)
 function parseDate(v, label) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v ?? ""))) throw new SaveError(`${label} ไม่ถูกต้อง`);
-  return v;
+  const s = String(v ?? "");
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
+  if (!ok) throw new SaveError(`${label} ไม่ถูกต้อง`);
+  return s;
+}
+function todayISO() {
+  const t = new Date();
+  t.setMinutes(t.getMinutes() - t.getTimezoneOffset());
+  return t.toISOString().slice(0, 10);
 }
 function isoOf(d) {
   return d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10);

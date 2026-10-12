@@ -20,7 +20,7 @@ export async function verifyIntranetLogin(payrollNo, password) {
 // ผู้ใช้ที่ login ครั้งแรกจะถูกเพิ่มเป็น AUDITOR อัตโนมัติ แอดมินเปลี่ยนบทบาทหรือปิดบัญชีได้ที่ mra.AppUser
 export async function upsertAppUser(username, fullName) {
   const r = await query(
-    `MERGE mra.AppUser AS t
+    `MERGE mra.AppUser WITH (HOLDLOCK) AS t
      USING (SELECT @u AS Username, @n AS FullName) AS s ON t.Username = s.Username
      WHEN MATCHED THEN UPDATE SET FullName = s.FullName
      WHEN NOT MATCHED THEN INSERT (Username, FullName, RoleCode) VALUES (s.Username, s.FullName, 'AUDITOR')

@@ -78,6 +78,23 @@ export async function getCriteriaMatrix(filter) {
   };
 }
 
+/* ---------- เกณฑ์ที่ไม่ผ่านบ่อยที่สุด (ใช้ใน dashboard, สูตรเดียวกับตารางรายเกณฑ์) ---------- */
+export async function getTopFailedCriteria(filter, top = 10, minRated = 5) {
+  const { p } = params(filter);
+  const r = await query(
+    `${REC_SQL}
+     WITH ${CRIT_CTE}
+     SELECT TOP (@top) cr.ContentNo, MAX(ac.TitleEn) AS TitleEn, cr.CriterionNo, MAX(c.CriterionText) AS CriterionText,
+            Fail = SUM(cr.Rated) - SUM(cr.Passed), Rated = SUM(cr.Rated)
+       FROM cr JOIN mra.AuditCriterion c ON c.CriterionId = cr.CriterionId JOIN mra.AuditContent ac ON ac.ContentId = cr.ContentId
+      GROUP BY cr.ContentNo, cr.CriterionNo
+     HAVING SUM(cr.Rated) >= @min
+      ORDER BY 1.0 * (SUM(cr.Rated) - SUM(cr.Passed)) / SUM(cr.Rated) DESC, cr.ContentNo, cr.CriterionNo;`,
+    { ...p, top: [sql.Int, top], min: [sql.Int, minRated] }
+  );
+  return r.recordset.map((c) => ({ ...c, rate: (c.Fail * 100) / c.Rated }));
+}
+
 /* ---------- รายละเอียดเกณฑ์ข้อเดียว ---------- */
 export async function getCriterionDetail(filter, contentNo, criterionNo) {
   const { mon, p } = params(filter);

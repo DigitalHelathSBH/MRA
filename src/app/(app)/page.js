@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser, CAN_EDIT } from "@/lib/auth";
+import { requireUser, logAccess, CAN_EDIT } from "@/lib/auth";
 import { listWorklist, getDepartmentsAndWards } from "@/lib/audit";
 import { thDate, STATUS_TH } from "@/lib/format";
 import AddCaseForm from "./add-case-form";
@@ -31,6 +31,7 @@ export default async function WorklistPage({ searchParams }) {
     listWorklist({ month, deptId: f.deptId, wardId: f.wardId, q: f.q }),
   ]);
   const rows = f.status ? all.filter((r) => r.Status === f.status) : all;
+  await logAccess(user.UserId, "WORKLIST_VIEW", null, `month ${month}, ${rows.length} rows${f.q ? ", search" : ""}`);
   const count = (s) => all.filter((r) => r.Status === s).length;
   const canEdit = CAN_EDIT.includes(user.RoleCode);
 

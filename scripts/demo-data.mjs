@@ -86,7 +86,7 @@ if (cmd === "clear") {
         }, mode, user);
         mode === "complete" ? done++ : drafts++;
       } catch (e) {
-        console.log(`  ข้ามเคส: ${e.message}`);
+        console.log(`  ข้ามเคส: ${e.number ? `SQL error ${e.number}` : "บันทึกไม่ผ่านการตรวจสอบ"}`); // ไม่พิมพ์ข้อความเต็ม อาจมี AN
       }
     }
     console.log(`${month}: สุ่ม ${saved.inserted} ราย`);

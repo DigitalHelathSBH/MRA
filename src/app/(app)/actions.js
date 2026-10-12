@@ -9,7 +9,14 @@ export async function addCase(_prev, formData) {
   const user = await requireUser(CAN_EDIT);
   const an = String(formData.get("an") ?? "").trim();
   if (!/^\d{6,12}$/.test(an)) return { error: "AN ต้องเป็นตัวเลขเท่านั้น", an };
-  const r = await addWorklistByAN(an, user);
+  let r;
+  try {
+    r = await addWorklistByAN(an, user);
+  } catch (err) {
+    if (err.number === 2601 || err.number === 2627) return { error: `AN ${an} อยู่ในรายการแล้ว`, an };
+    console.error(`addCase failed (user ${user.UserId}):`, err.number ?? "", err.code ?? "");
+    return { error: "เพิ่มเคสไม่สำเร็จ เชื่อมต่อ HIS หรือฐานข้อมูลไม่ได้ กรุณาลองใหม่", an };
+  }
   if (r.error) return { error: r.error, an };
   await logAccess(user.UserId, "WORKLIST_ADD", r.an);
   redirect(`/audit/${r.an}`);

@@ -1,5 +1,6 @@
 import { requireUser, logAccess } from "@/lib/auth";
 import { getDashboard, currentFiscalYear, fiscalMonths } from "@/lib/dashboard";
+import { getTopFailedCriteria } from "@/lib/reports";
 import { getDepartmentsAndWards } from "@/lib/audit";
 import { BANDS, bandRangeText } from "@/lib/bands";
 import SearchSelect from "@/components/search-select";
@@ -18,7 +19,9 @@ export default async function DashboardPage({ searchParams }) {
   const fy = Number(sp.fy) || nowFy;
   const deptId = Number(sp.dept) || null;
 
-  const [d, { departments }] = await Promise.all([getDashboard({ fy, month: sp.month, deptId }), getDepartmentsAndWards()]);
+  const [d, { departments }, topCriteria] = await Promise.all([
+    getDashboard({ fy, month: sp.month, deptId }), getDepartmentsAndWards(), getTopFailedCriteria({ fy, month: sp.month, deptId }),
+  ]);
   await logAccess(user.UserId, "DASHBOARD", null, `fy ${fy}${d.month ? ` month ${d.month}` : ""}${deptId ? ` dept ${deptId}` : ""}`);
 
   const s = d.summary;
@@ -178,13 +181,13 @@ export default async function DashboardPage({ searchParams }) {
 
         <div className="panel span-12">
           <h2>เกณฑ์ที่ไม่ผ่านบ่อยที่สุด 10 อันดับ</h2>
-          <p className="sub">{scopeText} · % ไม่ผ่าน = ไม่ผ่าน ÷ จำนวนครั้งที่ประเมิน (ไม่นับ NA) · แสดงเฉพาะเกณฑ์ที่ประเมินอย่างน้อย 5 ครั้ง · แดง ≥ 30%, เหลือง 20–29%</p>
-          {d.criteria.length ? (
+          <p className="sub">{scopeText} · % ไม่ผ่าน = ไม่ผ่าน ÷ จำนวนครั้งที่ประเมิน (ไม่นับ NA · Missing/No และข้อที่โดน gate นับเป็นไม่ผ่าน เหมือนหน้ารายงาน) · แสดงเฉพาะเกณฑ์ที่ประเมินอย่างน้อย 5 ครั้ง · แดง ≥ 30%, เหลือง 20–29%</p>
+          {topCriteria.length ? (
             <div className="tbl crit-table" style={{ maxHeight: "none" }}>
               <table>
                 <thead><tr><th>#</th><th>หัวข้อ</th><th>เกณฑ์</th><th className="r">ไม่ผ่าน</th><th>% ไม่ผ่าน</th></tr></thead>
                 <tbody>
-                  {d.criteria.map((c, i) => (
+                  {topCriteria.map((c, i) => (
                     <tr key={`${c.ContentNo}-${c.CriterionNo}`}>
                       <td className="num muted">{i + 1}</td>
                       <td style={{ whiteSpace: "nowrap" }}>{c.ContentNo}. {c.TitleEn}</td>

@@ -93,7 +93,8 @@ src/app/(app)       หน้าที่ต้อง login: / (เคสรอ�
 
 ## Backup / Deploy / Rollback
 - ยังไม่ได้กำหนด server deploy และที่เก็บ backup (รอผู้ใช้)
-- แผน: Docker (Next standalone) + Nginx HTTPS บน Linux ของ รพ. · rollback = deploy image tag ก่อนหน้า (ตารางเดิมไม่เปลี่ยนโครงสร้าง จึงไม่ต้อง rollback DB)
+- Docker (Next standalone, image tag = git commit) + Nginx HTTPS บน Linux ของ รพ. ดูขั้นตอนใน README · rollback = `TAG=<tag เดิม> docker compose up -d --no-build` (ตารางเดิมไม่เปลี่ยนโครงสร้าง จึงไม่ต้อง rollback DB)
+- Nginx ส่ง X-Forwarded-For เป็น $remote_addr ค่าเดียว (กันปลอม IP ใน AccessLog) และไม่ log query string
 
 ## บันทึกปัญหาที่เคยเจอ
 - ไฟล์ระบบเดิมใน Z:\NewIntranet\MRA เข้ารหัส TIS-620 (อ่านด้วย `iconv -f TIS-620 -t UTF-8`) ยกเว้น Login.aspx เป็น UTF-8

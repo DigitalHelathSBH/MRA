@@ -23,6 +23,8 @@ GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_Ward_HisWardCode')
     CREATE UNIQUE INDEX UX_Ward_HisWardCode ON mra.Ward (HisWardCode) WHERE HisWardCode IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_ImportBatch_Source')
+    CREATE UNIQUE INDEX UX_ImportBatch_Source ON mra.ImportBatch (SourceFileName);   -- รอบสุ่มเดือนละครั้ง
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_Doctor_Code')
     CREATE UNIQUE INDEX UX_Doctor_Code ON mra.Doctor (DoctorCode) WHERE DoctorCode IS NOT NULL;
 GO
@@ -55,6 +57,8 @@ BEGIN
     WHERE ar.AuditId = @AuditId;
 
     IF @AN IS NULL            THROW 50020, N'ไม่พบผลการตรวจ', 1;
+    IF LEN(@Auditor) > 6 OR LEN(@UserCode) > 6
+                              THROW 50026, N'รหัสพนักงานยาวเกิน 6 ตัวอักษร บันทึกลงตารางเดิม (auditor/entry_by) ไม่ได้', 1;
     IF @Status <> 'COMPLETED' THROW 50021, N'ส่งเข้าระบบเดิมได้เฉพาะเคสที่บันทึกเสร็จแล้ว', 1;
     IF @LegacyDept IS NULL    THROW 50022, N'แผนกนี้ยังไม่ได้จับคู่กับแผนกในระบบเดิม (LegacyDepartmentId)', 1;
     IF @Overall IS NULL       THROW 50023, N'ยังไม่ได้เลือก Overall finding', 1;
@@ -101,6 +105,8 @@ BEGIN
                d9 = MAX(CASE WHEN CriterionNo = 9 THEN Val END)
         FROM crit GROUP BY ContentId
     )
+    -- ช่องเกณฑ์ที่หัวข้อนั้นไม่มี (เช่น content 2 มี 7 ข้อ → data8, data9) ใช้ 'NA' แบบระบบเดิม
+    -- ยกเว้นหัวข้อที่เป็น NA ทั้งหัวข้อใช้ '0' (ReportIPD เดิมหัก sum(na) อยู่แล้ว)
     INSERT INTO dbo.mra_ipd
         (an, ipd_items_id, na, missing, no, data1, data2, data3, data4, data5, data6, data7, data8, data9,
          cut_score, get_score, full_score, etc_note, audit_time)
@@ -108,13 +114,14 @@ BEGIN
            CASE WHEN acr.ContentStatus = 'NA' THEN 1 ELSE 0 END,
            CASE WHEN acr.ContentStatus = 'MISSING' THEN 1 ELSE 0 END,
            CASE WHEN acr.ContentStatus = 'NO' THEN 1 ELSE 0 END,
-           ISNULL(pv.d1,'0'), ISNULL(pv.d2,'0'), ISNULL(pv.d3,'0'), ISNULL(pv.d4,'0'), ISNULL(pv.d5,'0'),
-           ISNULL(pv.d6,'0'), ISNULL(pv.d7,'0'), ISNULL(pv.d8,'0'), ISNULL(pv.d9,'0'),
+           ISNULL(pv.d1, e.empty), ISNULL(pv.d2, e.empty), ISNULL(pv.d3, e.empty), ISNULL(pv.d4, e.empty), ISNULL(pv.d5, e.empty),
+           ISNULL(pv.d6, e.empty), ISNULL(pv.d7, e.empty), ISNULL(pv.d8, e.empty), ISNULL(pv.d9, e.empty),
            CASE WHEN acr.ContentStatus = 'ASSESS' AND ac.AllowDeduction = 1 AND acr.DeductionFlag = 1 THEN ac.MaxDeduction ELSE 0 END,
            acr.SumScore, acr.FullScore, LEFT(ISNULL(acr.Remark, N''), 300), 1   -- etc_note เดิมยาว 300
     FROM mra.AuditContentResult acr
     JOIN mra.AuditContent ac ON ac.ContentId = acr.ContentId
     LEFT JOIN pv ON pv.ContentId = acr.ContentId
+    CROSS APPLY (SELECT CASE WHEN acr.ContentStatus = 'NA' THEN '0' ELSE 'NA' END) e(empty)
     WHERE acr.AuditId = @AuditId;
 
     UPDATE mra.AuditRecord SET LegacySyncedAt = SYSDATETIME() WHERE AuditId = @AuditId;

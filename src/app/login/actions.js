@@ -32,6 +32,7 @@ export async function login(_prev, formData) {
     return { error: "รหัสพนักงานหรือรหัสผ่านไม่ถูกต้อง หรือบัญชีพ้นสภาพแล้ว", payrollNo };
   }
   fails.delete(payrollNo);
+  if (fails.size > 5000) fails.clear(); // กัน Map โตไม่จำกัด
 
   const user = await upsertAppUser(payrollNo, emp.FullName);
   if (!user.IsActive) return { error: "บัญชีนี้ถูกปิดการใช้งานในระบบ MRA กรุณาติดต่อผู้ดูแล", payrollNo };

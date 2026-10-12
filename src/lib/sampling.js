@@ -102,6 +102,7 @@ export async function saveSample(month, items, user, auditMonth = null) {
   if (!Array.isArray(items) || !items.length || items.length > 500) throw userError("รายชื่อไม่ถูกต้อง");
   const list = items.map((x) => ({ an: String(x.an), seqNo: Number(x.seqNo) || null }));
   if (list.some((x) => !/^\d{6,12}$/.test(x.an))) throw userError("AN ไม่ถูกต้อง");
+  if (to > new Date()) throw userError("เดือนที่จำหน่ายต้องเป็นเดือนที่จบไปแล้ว");
   let auditDate = null;
   if (auditMonth != null) {
     if (!/^\d{4}-\d{2}$/.test(auditMonth)) throw userError("เดือนที่ Audit ไม่ถูกต้อง");

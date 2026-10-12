@@ -18,6 +18,7 @@ const config = {
   database: process.env.DB_NAME,
   options: { encrypt: false, trustServerCertificate: true, appName: "MRA-IPD-Web" },
   pool: { max: 10, min: 0, idleTimeoutMillis: 30000 },
+  requestTimeout: 120000, // สุ่มรายชื่อ/บันทึกรอบสุ่ม query ข้าม SSBDatabase อาจเกินค่าเริ่มต้น 15 วินาที
 };
 
 // เก็บ pool ไว้ที่ globalThis เพื่อไม่ให้ dev hot-reload เปิด connection ซ้ำ

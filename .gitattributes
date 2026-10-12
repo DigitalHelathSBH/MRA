@@ -1,0 +1,4 @@
+# บังคับ LF ทุกไฟล์ข้อความ (deploy บน Linux)
+* text=auto eol=lf
+*.png binary
+*.ico binary

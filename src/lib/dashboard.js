@@ -19,7 +19,7 @@ export function fiscalMonths(fyBE) {
 
 // ข้อมูล dashboard (เฉพาะผลที่บันทึกเสร็จ, จัดกลุ่มตามเดือนที่จำหน่าย) — ไม่มีข้อมูลระบุตัวผู้ป่วย
 // - แนวโน้มรายเดือน / รายแผนก: ทั้งปีงบ
-// - สรุป, รายแผนก, ราย content, เกณฑ์ที่ไม่ผ่าน: ทั้งปี หรือเฉพาะเดือน month ('YYYY-MM') ถ้าระบุ
+// - สรุป, รายแผนก, ราย content: ทั้งปี หรือเฉพาะเดือน month ('YYYY-MM') ถ้าระบุ (เกณฑ์ที่ไม่ผ่านบ่อย: reports.getTopFailedCriteria)
 export async function getDashboard({ fy, month, deptId }) {
   const { from, to } = fiscalRange(fy);
   const mon = month && fiscalMonths(fy).includes(month) ? month : null;
@@ -73,24 +73,13 @@ export async function getDashboard({ fy, month, deptId }) {
        JOIN mra.AuditContent ac ON ac.ContentId = acr.ContentId
       GROUP BY ac.ContentNo, ac.TitleEn, ac.TitleTh ORDER BY ac.ContentNo;
 
-     -- 5) เกณฑ์ที่ไม่ผ่านบ่อยที่สุด (ช่วงที่เลือก, ประเมินอย่างน้อย 5 ครั้ง)
-     SELECT TOP 10 ac.ContentNo, ac.TitleEn, c.CriterionNo, c.CriterionText,
-            Fail = SUM(CASE WHEN r.Result = 'FAIL' THEN 1 ELSE 0 END),
-            Rated = SUM(CASE WHEN r.Result IN ('PASS','FAIL') THEN 1 ELSE 0 END)
-       FROM @done x JOIN mra.AuditCriterionResult r ON r.AuditId = x.AuditId
-       JOIN mra.AuditCriterion c ON c.CriterionId = r.CriterionId
-       JOIN mra.AuditContent ac ON ac.ContentId = c.ContentId
-      GROUP BY ac.ContentNo, ac.TitleEn, c.CriterionNo, c.CriterionText
-     HAVING SUM(CASE WHEN r.Result IN ('PASS','FAIL') THEN 1 ELSE 0 END) >= 5
-      ORDER BY 1.0 * SUM(CASE WHEN r.Result = 'FAIL' THEN 1 ELSE 0 END)
-               / NULLIF(SUM(CASE WHEN r.Result IN ('PASS','FAIL') THEN 1 ELSE 0 END), 0) DESC, ac.ContentNo, c.CriterionNo;
 
-     -- 6) ปีงบประมาณที่มีข้อมูล (ตัวเลือก)
+     -- 5) ปีงบประมาณที่มีข้อมูล (ตัวเลือก)
      SELECT DISTINCT FY = YEAR(DischargeDate) + 543 + CASE WHEN MONTH(DischargeDate) >= 10 THEN 1 ELSE 0 END
        FROM mra.AuditWorklist WHERE WorklistStatus <> 'CANCELLED';`,
     { from: [sql.Date, from], to: [sql.Date, to], dept: [sql.Int, deptId || null], mon: [sql.Char(7), mon] }
   );
-  const [[sum], months, depts, deptMonths, contents, criteria, fys] = r.recordsets;
+  const [[sum], months, depts, deptMonths, contents, fys] = r.recordsets;
   const pct = (s, f) => (f ? (s * 100) / f : null);
   const byMon = (rows) => {
     const m = new Map(rows.map((x) => [x.Mon, x]));
@@ -104,7 +93,7 @@ export async function getDashboard({ fy, month, deptId }) {
     month: mon,
     summary: { ...sum, pct: pct(sum.ScoreSum, sum.FullSum) },
     months: byMon(months),
-    depts: depts.map((d) => ({ ...d, pct: pct(d.ScoreSum, d.FullSum) })).sort((a, b) => b.pct - a.pct),
+    depts: depts.map((d) => ({ ...d, pct: pct(d.ScoreSum, d.FullSum) })).sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1)),
     // แนวโน้มรายแผนก เรียงตามจำนวนเคสทั้งปี (ไม่เปลี่ยนตามเดือนที่เลือก)
     deptTrends: deptIds
       .map((id) => {
@@ -113,7 +102,6 @@ export async function getDashboard({ fy, month, deptId }) {
       })
       .sort((a, b) => b.N - a.N),
     contents: contents.map((c) => ({ ...c, pct: pct(c.ScoreSum, c.FullSum) })),
-    criteria: criteria.map((c) => ({ ...c, rate: c.Rated ? (c.Fail * 100) / c.Rated : 0 })),
     fiscalYears: fys.map((x) => x.FY),
   };
 }

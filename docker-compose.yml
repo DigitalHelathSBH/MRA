@@ -1,8 +1,9 @@
-# ใช้: docker compose up -d --build   (ไฟล์ .env อยู่ข้างไฟล์นี้บน server ห้าม commit)
+# ใช้: TAG=$(git rev-parse --short HEAD) docker compose up -d --build
+# (ไฟล์ .env อยู่ข้างไฟล์นี้บน server ห้าม commit)
 services:
   mra-ipd:
     build: .
-    image: mra-ipd:latest
+    image: mra-ipd:${TAG:-latest}   # ใส่ tag ตาม commit เพื่อ rollback ได้โดยไม่ต้อง build ใหม่
     container_name: mra-ipd
     env_file: .env
     environment:
@@ -10,3 +11,8 @@ services:
     ports:
       - "127.0.0.1:3000:3000"   # เปิดเฉพาะในเครื่อง ให้ Nginx เป็นทางเข้า
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

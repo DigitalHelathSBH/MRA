@@ -200,6 +200,7 @@ export default function AuditSheet({ criteria, initial, patient, refs, meta }) {
           <label htmlFor="ovSpec">ระบุรายละเอียด {form.overall === "3" && <span style={{ color: "var(--fail)" }}>*</span>}</label>
           <textarea id="ovSpec" rows={2} maxLength={1000} value={form.spec} disabled={ro}
             onChange={(e) => set({ spec: e.target.value, ...(e.target.value && !form.overall ? { overall: "3" } : {}) })} />
+          <span className="hint">ห้ามใส่ชื่อ HN หรือเลขบัตรผู้ป่วยในช่องนี้</span>
         </div>
       </div>
 
@@ -210,6 +211,7 @@ export default function AuditSheet({ criteria, initial, patient, refs, meta }) {
             <div className="field">
               <label htmlFor="reason">เหตุผลการแก้ไข <span style={{ color: "var(--fail)" }}>*</span></label>
               <textarea id="reason" rows={2} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
+              <span className="hint">ห้ามใส่ชื่อ HN หรือเลขบัตรผู้ป่วย</span>
             </div>
           )}
           <div className="row">
@@ -296,7 +298,7 @@ function ContentItem({ c, i, it, ro, isOpen, onToggle, onStatus, onCrit, onDed, 
             </div>
           </div>
           <div className="field">
-            <label htmlFor={`rm-${i}`}>หมายเหตุ</label>
+            <label htmlFor={`rm-${i}`}>หมายเหตุ <span className="hint">(ห้ามใส่ชื่อ/HN ผู้ป่วย)</span></label>
             <textarea id={`rm-${i}`} rows={2} maxLength={500} value={it.remark} disabled={ro} onChange={(e) => onRemark(e.target.value)} />
           </div>
         </div>

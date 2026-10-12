@@ -33,7 +33,7 @@ const user = (await query(`
 try {
   // 1) เพิ่มเคส
   const add = await addWorklistByAN(an, user);
-  check("เพิ่มเคสด้วย AN", add.ok, add.error);
+  check("เพิ่มเคสด้วย AN", add.ok, add.error?.replace(an, mask(an)));
   const dup = await addWorklistByAN(an, user);
   check("เพิ่ม AN ซ้ำถูกปฏิเสธ", !!dup.error);
   const missing = await addWorklistByAN("99999999", user);
@@ -89,7 +89,8 @@ try {
   // 6) ตรวจตารางเดิม
   const lm = (await query(`SELECT audit_time, audit_year, auditor, department_id, overall, overall_ipd1, overall_ipd2, entry_by FROM dbo.mra_ipd_main WHERE an = @an`, { an })).recordset;
   const li = (await query(`SELECT i.*, ac.ContentNo FROM dbo.mra_ipd i JOIN mra.AuditContent ac ON ac.LegacyItemId = i.ipd_items_id WHERE i.an = @an ORDER BY i.ipd_items_id`, { an })).recordset;
-  check("mra_ipd_main 1 แถว", lm.length === 1, JSON.stringify(lm[0] ?? {}));
+  check("mra_ipd_main 1 แถว", lm.length === 1,
+    lm[0] ? `audit_time ${lm[0].audit_time}, audit_year ${lm[0].audit_year}, dept ${lm[0].department_id}, overall ${lm[0].overall}` : "");
   check("mra_ipd 12 แถว", li.length === 12);
   check("ผลรวม get_score/full_score ตรงกับ AuditRecord",
     li.reduce((s, r) => s + r.get_score, 0) === c1.SumScore && li.reduce((s, r) => s + r.full_score, 0) === c1.FullScore);
@@ -97,9 +98,11 @@ try {
   check("gate content 7: ข้อ 1-3 เป็น '0' ข้อ 5-9 เป็น '1'",
     [r7.data1, r7.data2, r7.data3, r7.data4].every((v) => v === "0") && [r7.data5, r7.data6, r7.data7, r7.data8, r7.data9].every((v) => v === "1"),
     `${r7.data1}${r7.data2}${r7.data3}${r7.data4}|${r7.data5}${r7.data6}${r7.data7}${r7.data8}${r7.data9}`);
+  const r2 = li.find((r) => r.ContentNo === 2);
+  check("content 2 (7 เกณฑ์): data8/data9 = 'NA' แบบระบบเดิม", r2.data8 === "NA" && r2.data9 === "NA", `${r2.data8}/${r2.data9}`);
   const r3 = li.find((r) => r.ContentNo === 3), r8 = li.find((r) => r.ContentNo === 8), r12 = li.find((r) => r.ContentNo === 12), r1 = li.find((r) => r.ContentNo === 1);
   check("content 3 MISSING: missing=1 full=9 get=0", r3.missing === 1 && r3.full_score === 9 && r3.get_score === 0);
-  check("content 8 NA: na=1 full=0", r8.na === 1 && r8.full_score === 0);
+  check("content 8 NA: na=1 full=0 data='0'", r8.na === 1 && r8.full_score === 0 && r8.data1 === "0");
   check("content 12 หักคะแนน: cut_score=1 get=8", r12.cut_score === 1 && r12.get_score === 8, `cut ${r12.cut_score} get ${r12.get_score}`);
   check("content 1 NA ข้อ 2 → data2='NA' full=8", r1.data2 === "NA" && r1.full_score === 8 && r1.etc_note === "ทดสอบหมายเหตุ");
 
@@ -130,7 +133,9 @@ try {
     DELETE FROM dbo.mra_ipd_main WHERE an IN (@a, @b);
     DELETE h FROM mra.AuditHistory h JOIN mra.AuditRecord r ON r.AuditId = h.AuditId WHERE r.AN IN (@a, @b);
     DELETE FROM mra.AuditRecord WHERE AN IN (@a, @b);
-    DELETE FROM mra.AuditWorklist WHERE AN IN (@a, @b);`, { a: an, b: an2 });
+    DELETE FROM mra.AuditWorklist WHERE AN IN (@a, @b);
+    DELETE FROM mra.AccessLog WHERE UserId = @u;
+    DELETE FROM mra.AppUser WHERE UserId = @u;`, { a: an, b: an2, u: user.UserId });
   console.log(`\nผล: ผ่าน ${pass} · ไม่ผ่าน ${fail} (ลบข้อมูลทดสอบแล้ว)`);
   await (await getPool()).close();
   process.exitCode = fail ? 1 : 0;
