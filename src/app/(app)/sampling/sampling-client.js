@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { monLabel } from "@/lib/format";
+import { thDate, monLabel } from "@/lib/format";
 import { drawAction, saveSampleAction } from "./actions";
 
 // เดือนที่จำหน่ายเริ่มต้น = ย้อนหลัง 2 เดือนจากเดือนที่ audit
