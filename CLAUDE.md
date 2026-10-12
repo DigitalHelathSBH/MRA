@@ -71,6 +71,7 @@ src/app/(app)       หน้าที่ต้อง login: / (เคสรอ�
 - บันทึกเสร็จ = transaction เดียว: บันทึก `mra.*` → recalc → COMPLETED → `usp_SyncLegacy`
 - เขียนกลับตารางเดิม: `audit_time` = 1 เสมอ, `audit_year` = ปีงบ พ.ศ., data1–9 = '1'/'0'/'NA' (ข้อที่โดน gate = '0')
 - หน้าเดิมยังเปิดใช้คู่กัน: AN ที่มีในตารางเดิมแต่ `LegacySyncedAt` ว่าง = บันทึกจากระบบเดิม → ห้ามเขียนทับ (แสดงสถานะ LEGACY)
+- หน้าแบบตรวจแบ่งจอ: ซ้าย = เวชระเบียนสแกน PDF ผ่าน `/api/chart/[an]` (proxy จาก `CHART_PDF_URL`, ต้อง login, เฉพาะ AN ใน worklist, log `CHART_VIEW`) · ไฟล์ต้นทางเดิมของ intranet คือ `/chart/{AN}.pdf` บนเครื่อง SBH_New (IP ภายใน 192.168.102.103)
 - รายชื่อเคส (AN) ในรายงานรายละเอียดเกณฑ์ (/reports/criterion) เห็นได้เฉพาะ `PYREXT.DIVISION` 802 (ฝ่ายสุขภาพดิจิทัล) และ 803 (ฝ่ายเวชระเบียน) — `CASE_LIST_DIVISIONS` ใน auth.js ตรวจทุก request และผู้ไม่มีสิทธิ์จะไม่ถูกดึงรายชื่อเลย
 - ผู้ใช้ login ครั้งแรกถูกเพิ่มเป็น AUDITOR อัตโนมัติ เปลี่ยนบทบาทที่ `mra.AppUser.RoleCode`
 
@@ -108,6 +109,8 @@ src/app/(app)       หน้าที่ต้อง login: / (เคสรอ�
 - `package-lock.json` ที่สร้างบน Windows ขาด `@emnapi/*` (บั๊ก npm กับ package wasm) ทำให้ `npm ci` ใน Docker พัง → ถ้าแก้ dependency ให้สร้าง lockfile ใหม่ใน Linux: `docker run --rm -v "$PWD":/app -w /app node:24-alpine npm install --package-lock-only` (Dockerfile ใช้ Node 24 ให้ตรงกับเครื่องพัฒนา)
 - DB `MRA` (และ SSBDatabase, saraburi) ใช้ compatibility level 120 → ห้ามใช้ OPENJSON, STRING_SPLIT, STRING_AGG ฯลฯ ใช้ `valuesList()` ใน db.js แทน · MRA_TEST ตั้งเป็น 120 ให้เหมือนกันแล้ว
 - ข้อความใน SQL ที่มีอักขระนอก Thai_CI_AS (เช่น ·) ต้องใช้ N'...' ไม่งั้นกลายเป็น ?
+- ต้องตั้ง `serverExternalPackages: ["mssql","tedious"]` ไม่งั้น route handler กับหน้าได้ mssql คนละชุด แต่ใช้ pool เดียวผ่าน globalThis → "validate is not a function"
+- อย่ารัน `next dev` กับ `next build` พร้อมกันในโฟลเดอร์เดียว (`.next` ทับกัน หน้าเว็บพัง)
 - query ใหญ่บน SSBDatabase อาจเกิน timeout 15 วินาที (สคริปต์ตั้ง requestTimeout 300 วินาที)
 - `.env` ตอนนี้ใช้ DB login ของ HIS ที่มีสิทธิ์กว้าง (ผู้ใช้ตัดสินใจใช้ไปก่อน) ควรเปลี่ยนเป็น DB user เฉพาะโปรเจคเมื่อพร้อม
 - mssql อ่าน DATE/DATETIME2 เป็น UTC: ใช้ `isoDate`/`thDateTime` ใน `src/lib/format.js` (getter แบบ UTC) ไม่ให้วันเลื่อน

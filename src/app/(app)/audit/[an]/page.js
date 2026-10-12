@@ -4,6 +4,7 @@ import { requireUser, logAccess, CAN_EDIT } from "@/lib/auth";
 import { getCriteria, getAuditByAN, getDepartmentsAndWards, getDoctorOptions } from "@/lib/audit";
 import { isoDate, todayISO, thDate, thDateTime } from "@/lib/format";
 import AuditSheet from "./audit-sheet";
+import ChartSplit from "./chart-split";
 
 export const metadata = { title: "แบบตรวจ · MRA IPD" };
 
@@ -62,7 +63,9 @@ export default async function AuditPage({ params }) {
         <span className="muted">/</span>
         <span>AN <b>{head.AN}</b></span>
       </div>
-      <AuditSheet criteria={criteria.contents} initial={initial} patient={patient} refs={{ ...refs, doctors }} meta={meta} />
+      <ChartSplit an={head.AN}>
+        <AuditSheet criteria={criteria.contents} initial={initial} patient={patient} refs={{ ...refs, doctors }} meta={meta} />
+      </ChartSplit>
     </section>
   );
 }
