@@ -103,6 +103,7 @@ src/app/(app)       หน้าที่ต้อง login: / (เคสรอ�
 - ไฟล์ระบบเดิมใน Z:\NewIntranet\MRA เข้ารหัส TIS-620 (อ่านด้วย `iconv -f TIS-620 -t UTF-8`) ยกเว้น Login.aspx เป็น UTF-8
 - `create-next-app` ไม่ยอมชื่อโฟลเดอร์ตัวใหญ่ (MRA) → ชื่อแพ็กเกจคือ `mra-ipd`
 - ตารางเดิม: `etc_note` varchar(300) (ตัดหมายเหตุที่ส่งกลับเหลือ 300), `auditor`/`entry_by` varchar(6), ไม่มี FK ระหว่าง mra_ipd_main กับ mra_ipd
+- `package-lock.json` ที่สร้างบน Windows ขาด `@emnapi/*` (บั๊ก npm กับ package wasm) ทำให้ `npm ci` ใน Docker พัง → ถ้าแก้ dependency ให้สร้าง lockfile ใหม่ใน Linux: `docker run --rm -v "$PWD":/app -w /app node:24-alpine npm install --package-lock-only` (Dockerfile ใช้ Node 24 ให้ตรงกับเครื่องพัฒนา)
 - ข้อความใน SQL ที่มีอักขระนอก Thai_CI_AS (เช่น ·) ต้องใช้ N'...' ไม่งั้นกลายเป็น ?
 - query ใหญ่บน SSBDatabase อาจเกิน timeout 15 วินาที (สคริปต์ตั้ง requestTimeout 300 วินาที)
 - `.env` ตอนนี้ใช้ DB login ของ HIS ที่มีสิทธิ์กว้าง (ผู้ใช้ตัดสินใจใช้ไปก่อน) ควรเปลี่ยนเป็น DB user เฉพาะโปรเจคเมื่อพร้อม
