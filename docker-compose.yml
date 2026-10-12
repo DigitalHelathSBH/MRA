@@ -15,7 +15,8 @@ services:
       - "127.0.0.1:${APP_PORT:-3310}:3000"   # เปิดเฉพาะในเครื่อง ให้ Nginx เป็นทางเข้า (3000/3001 บน server มีระบบอื่นใช้)
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
+      # หน้า login อยู่ใต้ BASE_PATH (เช่น /mra/login) — BASE_PATH มาจาก .env
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:3000$${BASE_PATH:-}/login || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
