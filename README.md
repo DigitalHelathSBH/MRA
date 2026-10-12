@@ -26,9 +26,12 @@ server ภายใน `10.0.120.17` (HTTP) · โค้ดอยู่ที่
 1. ติดตั้ง Docker, Docker Compose plugin และ Nginx บน server
 2. `git clone https://github.com/digitalhealthsbh-mdi/MRA.git /opt/mra-ipd && cd /opt/mra-ipd`
 3. สร้าง `.env` จาก `.env.example`: `DB_NAME=MRA`, `COOKIE_SECURE=false` (ไม่มี HTTPS), สร้าง `SESSION_PASSWORD` ใหม่ด้วย `openssl rand -base64 32` (ห้ามใช้ค่าเดียวกับเครื่องพัฒนา) แล้ว `chmod 600 .env`
-4. `TAG=$(git rev-parse --short HEAD) docker compose up -d --build` → เว็บรันที่ `127.0.0.1:3000` (ตรวจด้วย `docker ps` ว่า healthy)
+4. `TAG=$(git rev-parse --short HEAD) docker compose up -d --build` → เว็บรันที่ `127.0.0.1:3310` (ตรวจด้วย `docker ps` ว่า healthy)
    - ถ้า server ออก internet ไม่ได้: build บนเครื่องที่ออกได้ `docker build -t mra-ipd:<tag> .` → `docker save mra-ipd:<tag> | gzip > mra-ipd.tar.gz` → คัดลอกไป server → `docker load < mra-ipd.tar.gz` → `TAG=<tag> docker compose up -d --no-build`
-5. คัดลอก `deploy/nginx/mra-ipd.conf` ไป `/etc/nginx/conf.d/` (ถ้ามี server block port 80 อยู่แล้ว ให้คัดลอกเฉพาะ `log_format` และ `location /mra`) แล้ว `nginx -t && systemctl reload nginx`
+5. Nginx (เครื่องนี้มีหลายระบบใช้ server block เดียวกันใน `/etc/nginx/conf.d/sbh.conf`):
+   - `sudo cp deploy/nginx/mra-logformat.conf /etc/nginx/conf.d/`
+   - เพิ่มเนื้อหา `deploy/nginx/mra-location.conf` ลงใน `server { server_name 10.0.120.17; }` ของ `sbh.conf` (backup ก่อน: `sudo cp sbh.conf sbh.conf.bak-mra`)
+   - `sudo nginx -t && sudo systemctl reload nginx` (ถ้า `nginx -t` ไม่ผ่าน ห้าม reload ให้คืนไฟล์ .bak)
 6. เปิด http://10.0.120.17/mra แล้ว login ด้วยรหัสพนักงาน
 
 อัปเดตเวอร์ชัน:

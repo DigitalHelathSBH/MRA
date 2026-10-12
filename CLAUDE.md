@@ -92,7 +92,7 @@ src/app/(app)       หน้าที่ต้อง login: / (เคสรอ�
 - ข้อมูลทดสอบต้องเป็นข้อมูลปลอม ห้ามส่งข้อมูลผู้ป่วยจริงให้ Claude
 
 ## Backup / Deploy / Rollback
-- Server: `10.0.120.17` (Linux, Docker + Nginx, HTTP ภายใน) โค้ดที่ `/opt/mra-ipd` เว็บ http://10.0.120.17/mra (`BASE_PATH=/mra` ตอน build, `COOKIE_SECURE=false`)
+- Server: `10.0.120.17` (ชื่อเครื่อง Receipt1, Ubuntu 22.04, Docker + Nginx 1.18, HTTP ภายใน, มีระบบอื่นอยู่ร่วม) โค้ดที่ `/opt/mra-ipd` แอปรันที่ `127.0.0.1:3310` (3000/3001 ระบบอื่นใช้) · Nginx เพิ่ม `location ^~ /mra` ใน `/etc/nginx/conf.d/sbh.conf` · ต้องใช้ sudo (มีรหัสผ่าน) เว็บ http://10.0.120.17/mra (`BASE_PATH=/mra` ตอน build, `COOKIE_SECURE=false`)
 - GitHub (private): https://github.com/digitalhealthsbh-mdi/MRA
 - DB จริง: ติดตั้ง `mra.*` ใน `MRA` แล้วเมื่อ 12 ต.ค. 2569 · ก่อนติดตั้งสำรองตารางเดิมไว้ที่ `MRA_TEST.bak.<ตาราง>_20261012` (db/backup_legacy_to_mra_test.sql) · ยังไม่มี job backup DB ประจำ (ควรให้ DBA กำหนด)
 - `.env` เครื่องพัฒนาใช้ `DB_NAME=MRA_TEST` เสมอ อย่าเปลี่ยนเป็น MRA ตอนทดสอบ
