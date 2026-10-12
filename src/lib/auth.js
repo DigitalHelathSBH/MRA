@@ -50,6 +50,19 @@ export async function requireUser(roles) {
 
 export const CAN_EDIT = ["ADMIN", "COORDINATOR", "AUDITOR"];
 
+// หน่วยงาน (PYREXT.DIVISION) ที่ดูรายชื่อเคส (AN) ในรายงานรายละเอียดเกณฑ์ได้
+// 802 = ฝ่ายสุขภาพดิจิทัล, 803 = ฝ่ายเวชระเบียน · ตรวจจาก HIS ทุก request (ย้ายหน่วยงานแล้วสิทธิ์เปลี่ยนทันที)
+export const CASE_LIST_DIVISIONS = ["802", "803"];
+
+export const canViewCaseList = cache(async (user) => {
+  if (!user) return false;
+  const r = await query(
+    `SELECT RTRIM(DIVISION) AS Division FROM ${HIS}.dbo.PYREXT WHERE PAYROLLNO = @u AND TERMINATEDATE IS NULL`,
+    { u: [sql.VarChar(20), user.Username] }
+  );
+  return CASE_LIST_DIVISIONS.includes(r.recordset[0]?.Division ?? "");
+});
+
 // บันทึกการเข้าถึง (PDPA) — เก็บ AN ได้ แต่ห้ามใส่ชื่อผู้ป่วยใน Detail
 export async function logAccess(userId, actionCode, an = null, detail = null) {
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;

@@ -71,6 +71,7 @@ src/app/(app)       หน้าที่ต้อง login: / (เคสรอ�
 - บันทึกเสร็จ = transaction เดียว: บันทึก `mra.*` → recalc → COMPLETED → `usp_SyncLegacy`
 - เขียนกลับตารางเดิม: `audit_time` = 1 เสมอ, `audit_year` = ปีงบ พ.ศ., data1–9 = '1'/'0'/'NA' (ข้อที่โดน gate = '0')
 - หน้าเดิมยังเปิดใช้คู่กัน: AN ที่มีในตารางเดิมแต่ `LegacySyncedAt` ว่าง = บันทึกจากระบบเดิม → ห้ามเขียนทับ (แสดงสถานะ LEGACY)
+- รายชื่อเคส (AN) ในรายงานรายละเอียดเกณฑ์ (/reports/criterion) เห็นได้เฉพาะ `PYREXT.DIVISION` 802 (ฝ่ายสุขภาพดิจิทัล) และ 803 (ฝ่ายเวชระเบียน) — `CASE_LIST_DIVISIONS` ใน auth.js ตรวจทุก request และผู้ไม่มีสิทธิ์จะไม่ถูกดึงรายชื่อเลย
 - ผู้ใช้ login ครั้งแรกถูกเพิ่มเป็น AUDITOR อัตโนมัติ เปลี่ยนบทบาทที่ `mra.AppUser.RoleCode`
 
 ## ตัวแปรใน .env (ดู .env.example)

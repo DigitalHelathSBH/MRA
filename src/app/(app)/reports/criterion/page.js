@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser, logAccess } from "@/lib/auth";
+import { requireUser, logAccess, canViewCaseList } from "@/lib/auth";
 import { getCriterionDetail } from "@/lib/reports";
 import { getDepartmentsAndWards } from "@/lib/audit";
 import { monLabel, pctText, thDate } from "@/lib/format";
@@ -20,10 +20,12 @@ export default async function CriterionPage({ searchParams }) {
   const cn = Number(sp.cn), no = Number(sp.no);
   if (!(cn >= 1 && cn <= 12 && no >= 1 && no <= 9)) notFound();
 
-  const [d, { departments }] = await Promise.all([getCriterionDetail(f, cn, no), getDepartmentsAndWards()]);
+  const showCases = await canViewCaseList(user);
+  const [d, { departments }] = await Promise.all([getCriterionDetail(f, cn, no, { includeCases: showCases }), getDepartmentsAndWards()]);
   if (!d) notFound();
   f.month = d.month;
-  await logAccess(user.UserId, "REPORT", null, `criterion ${cn}.${no} ${filterQuery(f)} · แสดง ${d.failed.length} AN`);
+  await logAccess(user.UserId, "REPORT", null, `criterion ${cn}.${no} ${filterQuery(f)}${showCases ? ` · แสดง ${d.failed.length} AN` : ""}`);
+  const failedCount = d.total.Rated - d.total.Passed;
 
   const months = d.months.map((m) => ({ ...m, ...monLabel(m.Mon) }));
   const active = f.month ? months.findIndex((m) => m.Mon === f.month) : null;
@@ -88,9 +90,11 @@ export default async function CriterionPage({ searchParams }) {
         {group(d.byDoctor, "แยกตามแพทย์", "แพทย์เจ้าของไข้")}
 
         <div className="panel span-12">
-          <h2>เคสที่ไม่ผ่านเกณฑ์นี้ ({d.failed.length.toLocaleString("th-TH")} เคส)</h2>
-          <p className="sub">กด AN เพื่อเปิดแบบตรวจ · หมายเหตุมาจากหมายเหตุของหัวข้อที่ผู้ตรวจบันทึก</p>
-          {d.failed.length ? (
+          <h2>เคสที่ไม่ผ่านเกณฑ์นี้ ({failedCount.toLocaleString("th-TH")} เคส)</h2>
+          {!showCases ? (
+            <div className="msg info">รายชื่อเคสดูได้เฉพาะเจ้าหน้าที่ฝ่ายเวชระเบียนและฝ่ายสุขภาพดิจิทัล</div>
+          ) : d.failed.length ? (<>
+            <p className="sub">กด AN เพื่อเปิดแบบตรวจ · หมายเหตุมาจากหมายเหตุของหัวข้อที่ผู้ตรวจบันทึก</p>
             <div className="tbl crit-table">
               <table>
                 <thead>
@@ -112,7 +116,7 @@ export default async function CriterionPage({ searchParams }) {
                 </tbody>
               </table>
             </div>
-          ) : <p className="hint">ไม่มีเคสที่ไม่ผ่านในช่วงนี้</p>}
+          </>) : <p className="hint">ไม่มีเคสที่ไม่ผ่านในช่วงนี้</p>}
         </div>
       </div>
     </section>

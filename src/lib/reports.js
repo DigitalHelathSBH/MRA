@@ -96,7 +96,8 @@ export async function getTopFailedCriteria(filter, top = 10, minRated = 5) {
 }
 
 /* ---------- รายละเอียดเกณฑ์ข้อเดียว ---------- */
-export async function getCriterionDetail(filter, contentNo, criterionNo) {
+// includeCases = false → ไม่ดึงรายชื่อเคส (AN) เลย ใช้กับผู้ที่ไม่มีสิทธิ์ (canViewCaseList)
+export async function getCriterionDetail(filter, contentNo, criterionNo, { includeCases = false } = {}) {
   const { mon, p } = params(filter);
   const r = await query(
     `${REC_SQL}
@@ -123,7 +124,7 @@ export async function getCriterionDetail(filter, contentNo, criterionNo) {
        FROM one o LEFT JOIN mra.Doctor doc ON doc.DoctorId = o.DoctorId GROUP BY o.DoctorId, doc.DoctorName
      UNION ALL
      SELECT 'month', o.Mon, o.Mon, SUM(o.Passed), COUNT(*) FROM one o GROUP BY o.Mon;
-
+     ${includeCases ? `
      WITH ${CRIT_CTE}
      SELECT o.AN, o.DischargeDate, d.DepartmentName, w.HisWardCode, w.WardName, doc.DoctorName, u.FullName AS AuditorName,
             Reason = CASE WHEN o.ContentStatus = 'MISSING' THEN N'Missing (ไม่พบเอกสาร)'
@@ -137,10 +138,10 @@ export async function getCriterionDetail(filter, contentNo, criterionNo) {
        LEFT JOIN mra.Doctor doc ON doc.DoctorId = o.DoctorId
        JOIN mra.AppUser u ON u.UserId = o.AuditorId
       WHERE o.ContentNo = @cn AND o.CriterionNo = @no AND o.Rated = 1 AND o.Passed = 0
-      ORDER BY o.DischargeDate DESC, o.AN;`,
+      ORDER BY o.DischargeDate DESC, o.AN;` : ""}`,
     { ...p, cn: [sql.TinyInt, contentNo], no: [sql.TinyInt, criterionNo] }
   );
-  const [[info], [tot], dims, failed] = r.recordsets;
+  const [[info], [tot], dims, failed = null] = r.recordsets;
   if (!info) return null;
   const by = (dim) => dims.filter((x) => x.Dim === dim).map((x) => ({ key: x.K ?? "-", name: x.Name, passed: x.Passed, rated: x.Rated, pct: pct(x.Passed, x.Rated) }))
     .sort((a, b) => a.pct - b.pct || b.rated - a.rated);
