@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { logout } from "../login/actions";
 import NavTabs from "./nav-tabs";
+import TrainingBanner from "@/components/training-banner";
 
 export default async function AppLayout({ children }) {
   const user = await requireUser();
@@ -9,6 +10,7 @@ export default async function AppLayout({ children }) {
 
   return (
     <>
+      <TrainingBanner />
       <header className="appbar">
         <div className="appbar-in">
           <Link href="/" className="logo" style={{ color: "inherit", textDecoration: "none" }}>

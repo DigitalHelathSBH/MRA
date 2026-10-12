@@ -316,3 +316,8 @@ a.hm:hover{box-shadow:0 0 0 2px var(--accent);transform:translateY(-1px)}
 .barlist.compact .bl-label small{display:inline;margin-left:6px}
 .barlist.compact .bl-track{height:10px}
 .crit-table{max-height:560px}
+
+/* แถบโหมดฝึกใช้งาน (ต่อ DB ทดสอบ) */
+.training-banner{background:var(--warn-soft);color:var(--warn);border-bottom:1px solid color-mix(in srgb,var(--warn) 30%,transparent);text-align:center;font-weight:600;font-size:15px;padding:6px 16px}
+.login-wrap .training-banner{border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:10px;margin-bottom:12px;width:min(400px,100%)}
+.login-wrap{align-content:center}
