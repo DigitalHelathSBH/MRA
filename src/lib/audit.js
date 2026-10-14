@@ -179,6 +179,7 @@ export async function getAuditByAN(an) {
             ar.AuditId, ar.DepartmentId AS ArDepartmentId, ar.WardId AS ArWardId, ar.DoctorId AS ArDoctorId,
             ar.AuditDate, ar.OverallFinding, ar.OverallSpecify, ar.RecordStatus, ar.UpdatedAt, ar.CompletedAt,
             ar.LegacySyncedAt, CONVERT(VARCHAR(20), CONVERT(BINARY(8), ar.RowVer), 1) AS RowVer,
+            ar.Hcode, ar.HospitalName, ar.FullScore, ar.SumScore, ar.ScorePct,
             au.Username AS AuditorCode, au.FullName AS AuditorName,
             DoctorCode = (SELECT DoctorCode FROM mra.Doctor WHERE DoctorId = ISNULL(ar.DoctorId, w.DoctorId)),
             IsLegacy = CASE WHEN ar.LegacySyncedAt IS NULL AND EXISTS (SELECT 1 FROM dbo.mra_ipd_main m WHERE m.an = w.AN)
@@ -187,7 +188,7 @@ export async function getAuditByAN(an) {
        LEFT JOIN mra.AuditRecord ar ON ar.WorklistId = w.WorklistId
        LEFT JOIN mra.AppUser au ON au.UserId = ar.AuditorId
       WHERE w.AN = @an AND w.WorklistStatus <> 'CANCELLED';
-     SELECT acr.ContentId, acr.ContentStatus, acr.DeductionFlag, acr.Remark
+     SELECT acr.ContentId, acr.ContentStatus, acr.DeductionFlag, acr.Remark, acr.FullScore, acr.SumScore
        FROM mra.AuditContentResult acr JOIN mra.AuditRecord ar ON ar.AuditId = acr.AuditId
        JOIN mra.AuditWorklist w ON w.WorklistId = ar.WorklistId
       WHERE w.AN = @an AND w.WorklistStatus <> 'CANCELLED';

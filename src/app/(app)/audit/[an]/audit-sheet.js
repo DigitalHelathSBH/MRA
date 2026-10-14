@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { contentScore, totalScore } from "@/lib/scoring";
 import { STATUS_TH } from "@/lib/format";
@@ -119,6 +120,12 @@ export default function AuditSheet({ criteria, initial, patient, refs, meta }) {
         <span className={`st ${meta.status}`}>{STATUS_TH[meta.status]}</span>
         <span className="spacer" />
         <span className="hint">{dirty ? "มีการแก้ไขที่ยังไม่บันทึก" : meta.savedAt ? `บันทึกล่าสุด ${meta.savedAt}` : "ยังไม่ได้บันทึก"}</span>
+        {(meta.status === "COMPLETED" || meta.status === "IN_PROGRESS") && (
+          <Link className="btn" href={`/print/audit/${patient.an}`} target="_blank" prefetch={false}
+            title={dirty ? "พิมพ์จากข้อมูลที่บันทึกแล้ว (ยังไม่รวมการแก้ไขที่ยังไม่บันทึก)" : "พิมพ์แบบตรวจรายคน (A4 แนวนอน)"}>
+            พิมพ์แบบตรวจ
+          </Link>
+        )}
       </div>
 
       {msg && <div ref={msgRef} className={`msg ${msg.kind}`} role="status">{msg.text}</div>}

@@ -336,3 +336,37 @@ a.hm:hover{box-shadow:0 0 0 2px var(--accent);transform:translateY(-1px)}
   .chart-split.open .strip .actions{grid-column:1/-1}
 }
 @media (max-width:1099px){.chart-pane iframe{height:70vh}}
+
+/* ---------- หน้าพิมพ์แบบตรวจรายคน (/print/audit/[an]) — สีกระดาษเสมอ ไม่ตาม dark mode ---------- */
+.print-page{page:audit;background:#e9e7ec;min-height:100vh;padding:16px;color:#111}
+.print-tools{max-width:297mm;margin:0 auto 12px;display:flex;gap:12px;align-items:center;font-size:14px;color:#444}
+.print-empty{max-width:297mm;margin:40px auto;text-align:center;color:#444}
+.print-sheet{background:#fff;color:#111;max-width:297mm;margin:0 auto;padding:10mm 12mm;font-family:var(--f-body);font-size:11.5px;line-height:1.45;box-shadow:0 1px 6px rgba(0,0,0,.15)}
+.print-sheet header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.print-sheet h1{font-size:16px;font-weight:700;margin:0}
+.print-draft{border:1.5px solid #b42318;color:#b42318;padding:0 8px;border-radius:4px;font-weight:600}
+.print-meta{display:flex;flex-wrap:wrap;gap:4px 18px;margin:6px 0 8px}
+.print-sheet table{width:100%;min-width:0;border-collapse:collapse;table-layout:fixed;font-size:11.5px}
+.print-sheet table th,.print-sheet table td,.print-sheet tbody tr:last-child td{border:1px solid #555;padding:2px 4px;vertical-align:middle;white-space:normal;overflow-wrap:anywhere}
+.print-sheet table th{font-size:11px;font-weight:600;color:#111;background:#f1f0f3;text-align:center;position:static;line-height:1.25}
+.print-sheet tbody tr:hover{background:none}
+.print-sheet .w-no{width:28px}
+.print-sheet .w-title{width:165px}
+.print-sheet .w-s{width:34px}
+.print-sheet .w-m{width:50px}
+.print-sheet .w-n{width:30px}
+.print-sheet .w-score{width:62px}
+.print-sheet td.c{text-align:center}
+.print-sheet td.remark{font-size:10.5px}
+.print-sheet p{margin:6px 0}
+.print-sheet .gap{display:inline-block;width:20px}
+.print-legend{font-size:10.5px;color:#444}
+.print-sheet footer{display:flex;justify-content:flex-end;gap:48px;margin-top:18px}
+.print-foot{font-size:9.5px;color:#666;margin-top:10px !important}
+@page audit{size:A4 landscape;margin:8mm}
+@media print{
+  body:has(.print-page),.print-page{background:#fff;padding:0;min-height:0}
+  .print-tools{display:none}
+  .print-sheet{box-shadow:none;max-width:none;padding:0}
+  .print-sheet th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
