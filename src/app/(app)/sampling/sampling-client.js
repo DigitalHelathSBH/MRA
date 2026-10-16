@@ -17,6 +17,7 @@ export default function SamplingClient({ today }) {
   const [auditMonth, setAuditMonth] = useState(thisMonth);
   const [month, setMonth] = useState(monthBefore(thisMonth, LAG_MONTHS));
   const [rows, setRows] = useState(null);
+  const [shortfalls, setShortfalls] = useState([]);
   const [msg, setMsg] = useState(null);
   const [saved, setSaved] = useState(null);
   const [pending, start] = useTransition();
@@ -37,6 +38,7 @@ export default function SamplingClient({ today }) {
       const r = await drawAction(month);
       if (r.error) { setRows(null); return setMsg({ kind: "err", text: r.error }); }
       setRows(r.rows);
+      setShortfalls(r.shortfalls ?? []);
       if (!r.rows.length) setMsg({ kind: "warn", text: "ไม่พบผู้ป่วยตามเงื่อนไขในเดือนนี้" });
     });
   }
@@ -51,6 +53,7 @@ export default function SamplingClient({ today }) {
     });
   }
 
+  const shortStay = rows?.filter((r) => r.shortStay).length ?? 0;
   const byDept = rows ? Object.entries(rows.reduce((a, r) => ((a[r.dept ?? "ยังไม่จับคู่"] = (a[r.dept ?? "ยังไม่จับคู่"] ?? 0) + 1), a), {})) : [];
 
   return (
@@ -96,6 +99,16 @@ export default function SamplingClient({ today }) {
             <b>ได้ {rows.length} ราย</b>
             {byDept.map(([d, n]) => <span key={d} className="st PENDING" style={{ fontWeight: 500 }}>{d} {n}</span>)}
           </div>
+          {shortStay > 0 && (
+            <div className="msg info" style={{ marginBottom: 10 }}>
+              เติมโควตาด้วยเคสที่นอนไม่ถึง 3 วัน {shortStay} ราย (วอร์ดที่เคสนอน 3–90 วันไม่พอ เลือกวันนอนมากที่สุดก่อน)
+            </div>
+          )}
+          {shortfalls.length > 0 && (
+            <div className="msg warn" style={{ marginBottom: 10 }}>
+              ได้ไม่ครบโควตา: {shortfalls.map((x) => `${x.label} ได้ ${x.got}/${x.quota}`).join(" · ")}
+            </div>
+          )}
           <div className="tbl">
             <table>
               <thead>
@@ -113,7 +126,8 @@ export default function SamplingClient({ today }) {
                     <td>{thDate(r.discharge)}</td>
                     <td className="r num">{r.los}</td>
                     <td className="hint">
-                      {r.inWorklist ? "มีในรายการแล้ว (ข้าม)" : r.inLegacy ? "ตรวจในระบบเดิมแล้ว" : !r.wardMapped ? "ward ยังไม่จับคู่" : ""}
+                      {[r.inWorklist ? "มีในรายการแล้ว (ข้าม)" : r.inLegacy ? "ตรวจในระบบเดิมแล้ว" : !r.wardMapped ? "ward ยังไม่จับคู่" : "",
+                        r.shortStay ? "นอนไม่ถึง 3 วัน (เติมโควตา)" : ""].filter(Boolean).join(" · ")}
                     </td>
                   </tr>
                 ))}

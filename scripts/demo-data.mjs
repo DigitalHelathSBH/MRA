@@ -46,7 +46,7 @@ if (cmd === "clear") {
 
   for (const [mi, month] of months.entries()) {
     if (await getSampleBatch(month)) { console.log(`${month}: มีรอบสุ่มอยู่แล้ว ข้าม`); continue; }
-    const rows = (await drawSample(month)).filter((x) => x.dept && !x.inWorklist);
+    const rows = (await drawSample(month)).rows.filter((x) => x.dept && !x.inWorklist);
     const saved = await saveSample(month, rows.map((x) => ({ an: x.an, seqNo: x.seqNo })), user);
     const cases = (await query(
       `SELECT w.AN, w.DepartmentId, w.WardId, d.DoctorCode, CONVERT(CHAR(10), w.DischargeDate, 126) AS Dc, dep.DepartmentName

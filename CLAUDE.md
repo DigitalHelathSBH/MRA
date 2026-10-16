@@ -45,7 +45,7 @@ src/lib/scoring.js  คิดคะแนนฝั่งหน้าจอ (ต�
 src/lib/dashboard.js ข้อมูล dashboard (ปีงบประมาณ ต.ค.–ก.ย., จัดตามเดือนที่จำหน่าย, เฉพาะเคส COMPLETED)
 src/components/     search-select (dropdown ค้นหาได้ ใช้แทน <select> ทุกที่), fancy-check (radio/checkbox), charts (SVG วัดความกว้างจริง), table-view
 src/lib/reports.js  รายงาน % ผ่านรายเกณฑ์ (หัวข้อ × เกณฑ์) + รายละเอียดเกณฑ์/หัวข้อ · % ผ่าน = ผ่านจริง (ไม่โดน gate) ÷ (ผ่าน+ไม่ผ่าน+หัวข้อ Missing/No) ไม่นับ NA
-src/lib/sampling.js สุ่มรายชื่อตามคิวรี่สุ่มของงานเวชระเบียน → mra.AuditWorklist (ImportBatch 'RANDOM-YYYY-MM' เดือนละครั้ง) · รอบ audit ตรวจเคสที่จำหน่ายย้อนหลัง 2 เดือน · เลือก "เดือนที่ Audit" ตอนสุ่ม เก็บเป็นวันที่ 1 ของเดือนใน PlannedAuditDate · หน้าเคสรอตรวจกรองตามเดือนที่ Audit (ไม่มีค่า = เดือนจำหน่าย + 2) · เพิ่มด้วย AN = เดือนปัจจุบัน · dashboard/รายงานเลือกได้ว่าจัดตามเดือนที่จำหน่าย (ค่าเริ่มต้น) หรือเดือนที่ Audit (`?by=audit`) นิยามอยู่ที่ `src/lib/basis.js` ใช้ร่วมกับหน้าเคสรอตรวจ
+src/lib/sampling.js สุ่มรายชื่อตามเกณฑ์งานเวชระเบียน (ฉบับ 16 ต.ค. 2569: ตาราง `QUOTAS` รายแผนก×วอร์ด รวม 70, นอน 3–90 วัน ไม่ครบให้เติมเคสนอน <3 วันที่วันนอนมากสุด, กุมารฯ อายุ ≤14 ปีเต็ม ณ วัน admit จาก PATIENT_INFO.BIRTHDATETIME) → mra.AuditWorklist (ImportBatch 'RANDOM-YYYY-MM' เดือนละครั้ง) · รอบ audit ตรวจเคสที่จำหน่ายย้อนหลัง 2 เดือน · เลือก "เดือนที่ Audit" ตอนสุ่ม เก็บเป็นวันที่ 1 ของเดือนใน PlannedAuditDate · หน้าเคสรอตรวจกรองตามเดือนที่ Audit (ไม่มีค่า = เดือนจำหน่าย + 2) · เพิ่มด้วย AN = เดือนปัจจุบัน · dashboard/รายงานเลือกได้ว่าจัดตามเดือนที่จำหน่าย (ค่าเริ่มต้น) หรือเดือนที่ Audit (`?by=audit`) นิยามอยู่ที่ `src/lib/basis.js` ใช้ร่วมกับหน้าเคสรอตรวจ
 src/app/login       หน้า login
 src/app/(app)       หน้าที่ต้อง login: / (เคสรอตรวจ), /audit/[an] (แบบตรวจ), /sampling (สุ่มรายชื่อ), /dashboard, /reports (+ /reports/criterion, /reports/content)
 ```
@@ -57,6 +57,7 @@ src/app/(app)       หน้าที่ต้อง login: / (เคสรอ�
 | `dbo.mra_ipd_main`, `dbo.mra_ipd` | ตารางเดิม เขียนผ่าน `mra.usp_SyncLegacy` เท่านั้น | มี (AN) | ห้ามแก้โครงสร้าง |
 | `dbo.ipd_items`, `departments`, `overall`, `overall_ipd`, `audit_time` | ข้อมูลอ้างอิงของระบบเดิม | ไม่มี | ห้ามแก้ |
 | `SSBDatabase.dbo.ADMMASTER`, `PYREXT`, `WardCode`, `ClinicName` | HIS | มี | **อ่านอย่างเดียว** |
+| `SSBDatabase.dbo.PATIENT_INFO` | วันเกิด (`BIRTHDATETIME`) ใช้กรองอายุกุมารฯ ตอนสุ่มใน WHERE เท่านั้น ห้าม SELECT ออก | มี (ชื่อ, วันเกิด, เลขบัตร) | **อ่านอย่างเดียว** |
 | `SSBDatabase.dbo.GetUserFullName(code)` | ชื่อพนักงาน/แพทย์จากรหัส | – | อ่านอย่างเดียว |
 | `saraburi.dbo.emp` | รหัสผ่าน intranet (ใช้ตรวจ login) | – | **อ่านอย่างเดียว** |
 

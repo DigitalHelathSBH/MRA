@@ -2,47 +2,79 @@ import "server-only";
 import { query, transaction, sql, HIS, valuesList } from "./db";
 import { upsertDoctor } from "./audit";
 
-// เงื่อนไขและโควตาตาม "คิวรี่สุ่ม MRA IPD.sql" ของงานเวชระเบียน (ไม่ดึงชื่อผู้ป่วย)
-const RANDOM_SQL = `
-WITH RandomCase AS (
-    SELECT
+// เกณฑ์สุ่มของงานเวชระเบียน (ฉบับ 16 ต.ค. 2569) · ไม่ดึงชื่อผู้ป่วย
+// เกณฑ์ร่วม: จำหน่ายในเดือนที่เลือก, มีประเภทการจำหน่าย (ไม่ว่าง/ไม่ใช่ 0), นอน 3–90 วัน (นับวันปฏิทิน)
+//   ถ้าวอร์ดไหนเคส 3–90 วันไม่ครบโควตา เติมด้วยเคสที่นอนไม่ถึง 3 วัน เลือกวันนอนมากที่สุดก่อน
+// ผู้ป่วยฝากวอร์ดแผนกอื่นไม่ถูกคัด ยกเว้น โสต ศอ นาสิก (ทุกวอร์ด) และวอร์ด 06/31/34 (ทุกแผนกที่ Dx หลักขึ้นต้น O)
+// [specialty (null = ทุกแผนก), ward (null = ทุกวอร์ด), โควตา, ต้องเป็น Dx O, อายุสูงสุด (ปีเต็ม ณ วันที่ admit), ชื่อ]
+export const QUOTAS = [
+  ["01", "01", 3, 0, null, "อายุรกรรม · 01"], ["01", "02", 3, 0, null, "อายุรกรรม · 02"],
+  ["01", "03", 3, 0, null, "อายุรกรรม · 03"], ["01", "04", 3, 0, null, "อายุรกรรม · 04"],
+  ["01", "41", 2, 0, null, "อายุรกรรม · 41"], ["01", "42", 2, 0, null, "อายุรกรรม · 42"],
+  ["01", "25", 1, 0, null, "อายุรกรรม · 25"], ["01", "33", 1, 0, null, "อายุรกรรม · 33"],
+  ["01", "44", 1, 0, null, "อายุรกรรม · 44"], ["01", "69", 1, 0, null, "อายุรกรรม · 69"],
+  ["02", "14", 3, 0, null, "ศัลยกรรม · 14"], ["02", "15", 3, 0, null, "ศัลยกรรม · 15"],
+  ["02", "22", 3, 0, null, "ศัลยกรรม · 22"], ["02", "46", 3, 0, null, "ศัลยกรรม · 46"],
+  ["02", "18", 2, 0, null, "ศัลยกรรม · 18"], ["02", "13", 1, 0, null, "ศัลยกรรม · 13"],
+  ["03", "07", 3, 0, null, "สูตินรีเวชกรรม · 07"],
+  [null, "06", 3, 1, null, "สูติกรรม (Dx O) · 06"], [null, "31", 2, 1, null, "สูติกรรม (Dx O) · 31"],
+  [null, "34", 1, 1, null, "สูติกรรม (Dx O) · 34"],
+  ["05", "20", 6, 0, 14, "กุมารเวชกรรม · 20"], ["05", "16", 4, 0, 14, "กุมารเวชกรรม · 16"],
+  ["05", "40", 3, 0, 14, "กุมารเวชกรรม · 40"], ["05", "17", 1, 0, 14, "กุมารเวชกรรม · 17"],
+  ["05", "21", 1, 0, 14, "กุมารเวชกรรม · 21"],
+  ["06", null, 1, 0, null, "โสต ศอ นาสิก · ทุกวอร์ด"],
+  ["07", "23", 4, 0, null, "จักษุ · 23"], ["07", "19", 2, 0, null, "จักษุ · 19"],
+  ["08", "29", 2, 0, null, "ศัลยกรรมกระดูก · 29"], ["08", "30", 2, 0, null, "ศัลยกรรมกระดูก · 30"],
+];
+
+// วอร์ด 06/31/34 (Dx O จากทุกแผนก) นับเป็นสูติกรรม (specialty 03 + Dx O) ตามตารางเกณฑ์ ไม่ใช่แผนกที่ admit
+const OB_WARDS = new Set(QUOTAS.filter((q) => q[0] === null && q[3]).map((q) => q[1]));
+const isDxO = (dx) => /^\s*O/i.test(String(dx ?? ""));
+export const deptSpecialty = (ward, specialty, dx) => (OB_WARDS.has(ward) && isDxO(dx) ? "03" : specialty);
+
+const RANDOM_SQL = (quotaValues) => `
+WITH Q AS (SELECT * FROM (VALUES ${quotaValues}) v(QId, Spec, Ward, Quota, DxO, MaxAge)),
+Pool AS (
+    SELECT q.QId, q.Quota,
         RTRIM(a.SPECIALTY) AS Specialty, RTRIM(c.ClinicName) AS ClinicName,
         RTRIM(a.ADMWARD) AS Ward, RTRIM(w.WardName) AS WardName,
         RTRIM(a.HN) AS HN, RTRIM(a.AN) AS AN,
         CONVERT(date, a.ADMDATETIME) AS AdmitDate, CONVERT(date, a.DISCHARGEDATETIME) AS DischargeDate,
         DATEDIFF(DAY, a.ADMDATETIME, a.DISCHARGEDATETIME) AS LOS,
+        DATEDIFF(MINUTE, a.ADMDATETIME, a.DISCHARGEDATETIME) AS LosMin,
         s.DIAGNOSES AS Dx,
-        ROW_NUMBER() OVER (PARTITION BY a.SPECIALTY, a.ADMWARD ORDER BY NEWID()) AS RN,
-        ROW_NUMBER() OVER (PARTITION BY a.SPECIALTY ORDER BY NEWID()) AS SpecialtyRN
+        -- AN เดียวเข้าได้หลายโควตา (โสตฯ ที่ Dx O และนอนวอร์ด 06/31/34) -> ใช้โควตาที่ระบุวอร์ดก่อน
+        ROW_NUMBER() OVER (PARTITION BY a.AN ORDER BY CASE WHEN q.Ward IS NULL THEN 1 ELSE 0 END, q.QId) AS Dup
     FROM ${HIS}.dbo.ADMMASTER a
+    JOIN Q q ON (q.Ward IS NULL OR q.Ward = a.ADMWARD) AND (q.Spec IS NULL OR q.Spec = a.SPECIALTY)
     LEFT JOIN ${HIS}.dbo.WardCode w   ON a.ADMWARD = w.CODE
     LEFT JOIN ${HIS}.dbo.IPDSUMMARY s ON a.AN = s.AN AND s.SUFFIX = 1
     LEFT JOIN ${HIS}.dbo.ClinicName c ON a.SPECIALTY = c.CODE
+    LEFT JOIN ${HIS}.dbo.PATIENT_INFO p ON q.MaxAge IS NOT NULL AND p.HN = a.HN  -- ใช้วันเกิดกรองอายุเท่านั้น ห้าม SELECT
     WHERE a.DISCHARGEDATETIME >= @from AND a.DISCHARGEDATETIME < @to
-      AND a.DISCHARGETYPE IS NOT NULL AND a.DISCHARGETYPE <> '0'
-      AND DATEDIFF(DAY, a.ADMDATETIME, a.DISCHARGEDATETIME) >= 3
-      AND (
-            (a.ADMWARD IN ('06','31','34') AND s.DIAGNOSES LIKE 'O%')
-         OR (a.ADMWARD = '07' AND a.SPECIALTY = '03')
-         OR (a.SPECIALTY = '02' AND a.ADMWARD IN ('13','14','15','18','22','46'))
-         OR (a.ADMWARD IN ('29','30') AND a.SPECIALTY = '08')
-         OR (a.ADMWARD IN ('19','23') AND a.SPECIALTY = '07')
-         OR (a.SPECIALTY = '06')
-         OR (a.SPECIALTY = '05' AND a.ADMWARD IN ('16','17','20','21','40'))
-         OR (a.SPECIALTY = '01' AND a.ADMWARD IN ('01','02','03','04','25','33','41','42','44','69'))
-      )
+      AND a.DISCHARGETYPE NOT IN ('', '0')
+      AND a.DISCHARGEDATETIME >= a.ADMDATETIME
+      AND DATEDIFF(DAY, a.ADMDATETIME, a.DISCHARGEDATETIME) <= 90
+      AND (q.DxO = 0 OR LTRIM(s.DIAGNOSES) LIKE 'O%')
+      -- ไม่สุ่มเคสที่อยู่ในรายการตรวจแล้ว หรือตรวจในระบบเดิมแล้ว (โควตาจะได้ครบตอนบันทึก)
+      AND NOT EXISTS (SELECT 1 FROM mra.AuditWorklist x WHERE x.AN = RTRIM(a.AN) COLLATE DATABASE_DEFAULT AND x.WorklistStatus <> 'CANCELLED')
+      AND NOT EXISTS (SELECT 1 FROM dbo.mra_ipd_main l WHERE l.an = RTRIM(a.AN) COLLATE DATABASE_DEFAULT)
+      AND (q.MaxAge IS NULL OR (p.BIRTHDATETIME IS NOT NULL AND
+           DATEDIFF(YEAR, p.BIRTHDATETIME, a.ADMDATETIME)
+             - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, p.BIRTHDATETIME, a.ADMDATETIME), p.BIRTHDATETIME) > a.ADMDATETIME THEN 1 ELSE 0 END
+           <= q.MaxAge))
+),
+Ranked AS (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY QId
+               ORDER BY CASE WHEN LOS >= 3 THEN 0 ELSE 1 END,       -- นอน 3–90 วันก่อน (สุ่ม)
+                        CASE WHEN LOS >= 3 THEN 0 ELSE LosMin END DESC, -- ไม่พอ -> นอนไม่ถึง 3 วัน นอนนานสุดก่อน
+                        NEWID()) AS RN
+    FROM Pool WHERE Dup = 1
 )
-SELECT ROW_NUMBER() OVER (ORDER BY Specialty, Ward, AN) AS SeqNo,
-       Specialty, ClinicName, Ward, WardName, HN, AN, AdmitDate, DischargeDate, LOS, Dx
-FROM RandomCase
-WHERE (Specialty = '06' AND SpecialtyRN = 1)
-   OR (Specialty <> '06' AND (
-          (Ward IN ('13','17','21','25','33','34','44','69') AND RN <= 1)
-       OR (Ward IN ('18','19','29','30','31','41','42') AND RN <= 2)
-       OR (Ward IN ('01','02','03','04','06','07','14','15','22','40','46') AND RN <= 3)
-       OR (Ward IN ('16','23') AND RN <= 4)
-       OR (Ward IN ('20') AND RN <= 6)))
-ORDER BY Specialty, Ward, AN`;
+SELECT ROW_NUMBER() OVER (ORDER BY QId, AN) AS SeqNo,  -- เรียงตามลำดับในตารางเกณฑ์
+       QId, Specialty, ClinicName, Ward, WardName, HN, AN, AdmitDate, DischargeDate, LOS, Dx
+FROM Ranked WHERE RN <= Quota
+ORDER BY QId, AN`;
 
 function monthRange(month) {
   if (!/^\d{4}-\d{2}$/.test(month)) throw userError("เดือนไม่ถูกต้อง");
@@ -65,9 +97,15 @@ export async function getSampleBatch(month) {
 // สุ่มรายชื่อ (ยังไม่บันทึก) พร้อมบอกว่าแผนก/ward จับคู่ได้หรือไม่ และ AN ไหนมีในระบบแล้ว
 export async function drawSample(month) {
   const { from, to } = monthRange(month);
-  const r = await query(RANDOM_SQL, { from: [sql.DateTime, from], to: [sql.DateTime, to] });
+  const qv = valuesList("q", QUOTAS.map((x, i) => [i, x[0], x[1], x[2], x[3], x[4]]),
+    [sql.Int, sql.VarChar(10), sql.VarChar(10), sql.Int, sql.Bit, sql.Int]);
+  const r = await query(RANDOM_SQL(qv.text), { ...qv.params, from: [sql.DateTime, from], to: [sql.DateTime, to] });
   const rows = r.recordset;
-  if (!rows.length) return [];
+  // โควตาที่สุ่มได้ไม่ครบ (แม้เติมเคสนอนไม่ถึง 3 วันแล้ว)
+  const got = new Map();
+  for (const x of rows) got.set(x.QId, (got.get(x.QId) ?? 0) + 1);
+  const shortfalls = QUOTAS.map((x, i) => ({ label: x[5], quota: x[2], got: got.get(i) ?? 0 })).filter((x) => x.got < x.quota);
+  if (!rows.length) return { rows: [], shortfalls };
   const ans = valuesList("an", rows.map((x) => [x.AN]), [sql.VarChar(20)]);
   const m = await query(
     `SELECT j.value AS AN,
@@ -81,18 +119,19 @@ export async function drawSample(month) {
   const flags = new Map(m.recordsets[0].map((x) => [x.AN, x]));
   const depts = m.recordsets[1];
   const wards = new Set(m.recordsets[2].map((x) => x.HisWardCode));
-  return rows.map((x) => {
+  return { shortfalls, rows: rows.map((x) => {
+    const spec = deptSpecialty(x.Ward, x.Specialty, x.Dx);
     const dept = depts
-      .filter((d) => d.HisSpecialtyCode === x.Specialty && (!d.HisDxPrefix || String(x.Dx ?? "").startsWith(d.HisDxPrefix)))
+      .filter((d) => d.HisSpecialtyCode === spec && (!d.HisDxPrefix || String(x.Dx ?? "").trimStart().startsWith(d.HisDxPrefix)))
       .sort((a, b) => (b.HisDxPrefix ? 1 : 0) - (a.HisDxPrefix ? 1 : 0))[0];
     const f = flags.get(x.AN) ?? {};
     return {
       seqNo: Number(x.SeqNo), an: x.AN, hn: x.HN, specialty: x.Specialty, clinic: x.ClinicName,
       ward: x.Ward, wardName: x.WardName, admit: x.AdmitDate, discharge: x.DischargeDate, los: x.LOS,
       dept: dept?.DepartmentName ?? null, wardMapped: wards.has(x.Ward),
-      inWorklist: !!f.InWorklist, inLegacy: !!f.InLegacy,
+      inWorklist: !!f.InWorklist, inLegacy: !!f.InLegacy, shortStay: x.LOS < 3,
     };
-  });
+  }) };
 }
 
 // บันทึกรายชื่อที่สุ่มแล้วเข้า worklist (ตรวจกับ HIS ซ้ำทุกราย ไม่เชื่อข้อมูลจาก client)
@@ -146,7 +185,7 @@ export async function saveSample(month, items, user, auditMonth = null) {
           ORDER BY CASE WHEN HisDxPrefix IS NULL THEN 1 ELSE 0 END;
          SELECT WardId FROM mra.Ward WHERE HisWardCode = @ward;
          SELECT 1 AS x FROM mra.AuditWorklist WHERE AN = @an AND WorklistStatus <> 'CANCELLED';`,
-        { spec: [sql.VarChar(10), a.Specialty ?? ""], dx: [sql.VarChar(sql.MAX), a.Dx ?? ""], ward: [sql.VarChar(10), a.Ward ?? ""], an: [sql.VarChar(20), a.AN] }
+        { spec: [sql.VarChar(10), deptSpecialty(a.Ward, a.Specialty ?? "", a.Dx)], dx: [sql.VarChar(sql.MAX), String(a.Dx ?? "").trimStart()], ward: [sql.VarChar(10), a.Ward ?? ""], an: [sql.VarChar(20), a.AN] }
       );
       const dept = map.recordsets[0][0];
       if (!dept || map.recordsets[2].length) { skipped.push(a.AN); continue; }

@@ -8,9 +8,9 @@ export async function drawAction(month) {
   try {
     const batch = await getSampleBatch(month);
     if (batch) return { error: `เดือนนี้สุ่มและบันทึกไปแล้ว ${batch.InsertedRows} ราย โดย ${batch.FullName}` };
-    const rows = await drawSample(month);
+    const { rows, shortfalls } = await drawSample(month);
     await logAccess(user.UserId, "SAMPLE_DRAW", null, `month ${month}, ${rows.length} rows`);
-    return { rows };
+    return { rows, shortfalls };
   } catch (err) {
     console.error(`drawSample failed (user ${user.UserId}):`, err.message);
     return { error: "สุ่มรายชื่อไม่สำเร็จ กรุณาลองใหม่หรือแจ้งผู้ดูแล" };
